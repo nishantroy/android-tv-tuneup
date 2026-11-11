@@ -11,6 +11,9 @@
 #
 # Packages are removed for the TV's user only (pm uninstall --user 0). The factory copy stays
 # on the read-only system partition, so every removal can be undone with --restore.
+#
+# Provided as-is, as a demonstration. You run this at your own risk and are responsible for
+# what it does to your TV. See docs/safety.md.
 set -euo pipefail
 
 usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-1}"; }

@@ -3,6 +3,10 @@
 Read this before changing your TV. It is an honest account of what the steps in this repository
 do, what can go wrong, and what was never tested. It is not legal advice.
 
+**You use this entirely at your own risk.** It is a demonstration shared for learning, tested
+on one TV, with no warranty and no support. Whatever happens to your device, data, accounts or
+warranty as a result of following it is your responsibility alone.
+
 ## What this does not do
 
 - It does not root the TV, unlock its bootloader, flash firmware, or use any exploit. The TV

@@ -6,6 +6,13 @@ with a small launcher that shows your apps and what you were watching.
 
 Everything is done over `adb`, the TV's own debugging connection. Every change can be undone.
 
+> **Disclaimer.** This is a demonstration, shared for learning and nothing else. It is not a
+> product and comes with no support and no warranty of any kind. It was tested on a single TV.
+> If you use any part of it, you do so entirely at your own risk and you take full
+> responsibility for whatever happens to your device, your data, your accounts and your
+> warranty. The authors and contributors accept no liability. If that isn't acceptable, don't
+> use it.
+
 | Before | After |
 | --- | --- |
 | ![The stock Android TV home screen](docs/images/before-home.png) | ![The replacement home screen](docs/images/after-home.png) |
@@ -80,6 +87,8 @@ one step at a time and check the TV still behaves after each.
 - **With an AI coding assistant:** [docs/with-an-assistant.md](docs/with-an-assistant.md) has a
   prompt to start from and the ground rules worth insisting on. This is how the project was
   originally done, and it is the better route for a TV model the lists don't cover.
+  [`AGENTS.md`](AGENTS.md) tells any assistant working in this repository to get your
+  confirmation before every change to the TV.
 
 ## Undoing it
 
@@ -123,6 +132,7 @@ uses neither.
 | `scripts/install-launcher.sh` | Installs the launcher and makes it Home |
 | `scripts/remove-launcher.sh` | Switches back to the stock home |
 | `docs/` | The guides, the safety notes, and the screenshots |
+| `AGENTS.md`, `CLAUDE.md` | Rules for AI assistants: confirm with the human before any change |
 
 ## License and credits
 

@@ -4,6 +4,9 @@
 #   scripts/remove-launcher.sh <tv-address> [--keep-app]
 #
 #   --keep-app  leave the launcher installed (and its layout saved), just stop using it as Home
+#
+# Provided as-is, as a demonstration. You run this at your own risk and are responsible for
+# what it does to your TV. See docs/safety.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

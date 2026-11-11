@@ -6,6 +6,9 @@
 # Builds launcher/build/tvhome.apk first if it isn't there (see launcher/build.sh for what
 # that needs). The stock Android TV home is disabled, not removed, so it can be switched back
 # on from the TV's own Settings or with scripts/remove-launcher.sh.
+#
+# Provided as-is, as a demonstration. You run this at your own risk and are responsible for
+# what it does to your TV. See docs/safety.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

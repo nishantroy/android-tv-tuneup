@@ -22,12 +22,19 @@ Clone this repository, open the assistant in it, and adapt this:
 >
 > Start with a read-only survey of the TV: model, Android version, memory, storage, what is
 > running, and which of the packages in `debloat/` exist on it. Then show me what you propose to
-> change and wait for me to agree. Don't root the TV or unlock its bootloader.
+> change and wait for me to agree. Ask me before every change you make to the TV, however
+> small, and don't treat one yes as covering the next thing. Don't root the TV or unlock its
+> bootloader.
 
 ## Ground rules worth insisting on
 
-These are what kept the original session safe. State them up front.
+These are what kept the original session safe. State them up front. The repository's
+[`AGENTS.md`](../AGENTS.md) carries the same rules, and assistants that read that file will
+pick them up on their own; say them anyway.
 
+- **Confirm before every change.** The assistant should tell you what it is about to do and
+  how to undo it, and wait for a yes each time. That includes key presses it sends to the TV:
+  in the original session, one sent to the wrong screen switched a setting off.
 - **Survey first, change nothing until a plan is agreed.** The first pass should only read.
 - **Remove packages one at a time,** checking after each that Android is still healthy. The
   script in `scripts/debloat.sh` does this.

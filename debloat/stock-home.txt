@@ -1,0 +1,8 @@
+# Helpers for the stock Android TV home screen. Only remove these AFTER the
+# replacement launcher is installed and working as Home; they are pointless
+# without the stock home and needed with it. scripts/remove-launcher.sh restores them.
+
+com.google.android.tvrecommendations                  # recommendation rows for the stock home
+com.tcl.partnercustomizer                             # TCL's layout config for the stock home
+com.google.android.leanbacklauncher                   # the older stock launcher
+com.google.android.leanbacklauncher.recommendations   # its recommendation rows

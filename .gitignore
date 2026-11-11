@@ -1,0 +1,11 @@
+# Build output, and the signing key each builder generates for themselves
+launcher/build/
+*.keystore
+
+# Personal notes about one particular TV (addresses, network names)
+CHANGES.md
+
+# Logs pulled from a TV
+tvdiag-*/
+
+.DS_Store

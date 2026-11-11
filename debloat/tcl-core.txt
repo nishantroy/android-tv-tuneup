@@ -1,0 +1,17 @@
+# Preinstalled packages on a TCL Android TV 9 set that nothing visible depends on.
+# One package per line; everything after # is a note. Lines can be commented out.
+# Removed for the TV's user only (pm uninstall --user 0): restorable, see README.
+
+com.tcl.bi                          # TCL usage telemetry
+com.tcl.messagebox                  # TCL promotional messages
+com.tcl.usercenter                  # TCL account
+com.tcl.xian.StartandroidService    # TCL activation tracker
+com.tcl.tvweishi                    # TCL "TV Guard" cleaner
+com.tcl.esticker                    # store demo sticker
+com.tcl.showmode                    # store demo mode
+com.tcl.useragreement               # setup-time agreement screen
+com.tcl.keyhelp                     # setup-time remote help
+com.tcl.copydatatotv                # setup-time data copy
+com.google.android.feedback         # Google feedback sender
+com.google.android.tv.bugreportsender   # Google bug report sender
+com.android.printspooler            # printing

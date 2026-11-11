@@ -1,0 +1,12 @@
+# Preinstalled packages that some people do use. Read each line and comment out
+# (with a leading #) anything you want to keep before running the script.
+
+com.tcl.assistant                   # TCL's own assistant (not Google Assistant)
+com.tcl.smartalexa                  # lets Alexa control the TV
+com.tcl.appmarket2                  # TCL app store (the Play Store is separate and stays)
+com.tcl.waterfall.overseas          # TCL Channel
+com.google.android.play.games       # Play Games
+com.google.android.videos           # Google Play Movies & TV
+com.google.android.youtube.tvmusic  # YouTube Music
+com.google.android.marvin.talkback  # TalkBack screen reader: KEEP if anyone uses accessibility features
+com.google.android.speech.pumpkin   # offline voice-command grammar; voice search was not re-tested after removing it

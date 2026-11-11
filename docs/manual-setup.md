@@ -216,7 +216,7 @@ hands the screensaver back to the TV's default when it uninstalls the launcher.
 ### Wallpapers (optional)
 
 Copy your own pictures, or the San Francisco set in this repository, to the launcher's folder
-on the TV. They join the built-in ones the next time the launcher starts.
+on the TV. From the next time the launcher starts they are shown in place of the built-in ones.
 
 ```sh
 adb -s $TV push wallpapers/san-francisco/*.jpg /sdcard/Android/data/local.tvhome/files/wallpapers/

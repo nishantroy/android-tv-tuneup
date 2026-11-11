@@ -33,8 +33,14 @@ class Lay:
     def ell(self, cx, cy, rx, ry, c): self.d.ellipse([s(cx - rx), s(cy - ry), s(cx + rx), s(cy + ry)], fill=c)
     def line(self, p, c, w): self.d.line(pts(p), fill=c, width=max(1, s(w)), joint="curve")
     def on(self, base, blur=0):
-        im = self.im.filter(ImageFilter.GaussianBlur(blur * SS)) if blur else self.im
+        # Blurred with color premultiplied by alpha, or the transparent surround bleeds in as a dark fringe.
+        im = self.im.convert("RGBa").filter(ImageFilter.GaussianBlur(blur * SS)).convert("RGBA") if blur else self.im
         return Image.alpha_composite(base, im)
+
+def moved(layer, dy):
+    """The same layer, slid down by dy (up if negative)."""
+    out_ = Lay(); out_.im.paste(layer.im, (0, s(dy))); out_.d = ImageDraw.Draw(out_.im)
+    return out_
 
 def glow(base, cx, cy, r, color, strength=1.0):
     layer = Image.new("RGB", (W * SS, H * SS), (0, 0, 0)); d = ImageDraw.Draw(layer)
@@ -90,7 +96,9 @@ def place(shape, x, y, scale=1.0, flip=False, rot=0.0):
     return r
 
 # When the launcher shows each picture: these words go into the file name (see Backdrop.java).
-WHEN = {"golden-gate": "dawn.dusk.fog", "coit-tower": "night", "painted-ladies": "dusk", "fleet-week": "day", "sea-lions": "dusk"}
+WHEN = {"golden-gate": "dawn.dusk.fog", "coit-tower": "night", "painted-ladies": "dusk", "fleet-week": "day", "sea-lions": "dusk",
+        "sutro-tower": "dawn.day.fog", "palace-of-fine-arts": "day", "bay-bridge": "night", "skyline": "night",
+        "conservatory": "day", "windmill": "dawn.day", "lands-end": "dusk", "baker-beach": "dusk", "ballpark": "day"}
 
 def save(im, name):
     im.convert("RGB").resize((W, H), Image.LANCZOS).save(f"{out}/{name}.{WHEN[name]}.jpg", quality=90)
@@ -304,3 +312,434 @@ if want("sea-lions"):
             L.poly(place([(px, py - bottom) for px, py in shape], x, y + 1, sc, flip), (34, 16, 34, 255))
         im = L.on(im)
     save(im, "sea-lions")
+
+
+def clouds(base, rnd, n, y0, y1, alpha=60, blur=14):
+    L = Lay()
+    for _ in range(n):
+        cx, cy = rnd.uniform(-50, W + 50), rnd.uniform(y0, y1)
+        for k in range(5): L.ell(cx + rnd.uniform(-90, 90), cy + rnd.uniform(-10, 10), rnd.uniform(60, 150), rnd.uniform(10, 24), (255, 255, 255, alpha))
+    return L.on(base, blur)
+
+def canopy(L, rnd, cx, cy, rad, color, n=12):
+    for _ in range(n):
+        a = rnd.uniform(0, 6.28); d = rnd.uniform(0, rad * 0.6)
+        L.ell(cx + d * math.cos(a), cy + d * math.sin(a) * 0.7, rad * 0.45, rad * 0.4, color)
+
+def mini_bridge(L, x0, x1, deck_y, height, color, towers=(0.3, 0.7), w=1.6):
+    """A small suspension bridge seen from far off: deck, two towers and the hung cables."""
+    L.rect(x0, deck_y, x1, deck_y + max(1.5, height * 0.03), color)
+    tx = [x0 + (x1 - x0) * t for t in towers]; top = deck_y - height
+    for t in tx:
+        L.rect(t - height * 0.035, top, t - height * 0.012, deck_y + height * 0.25, color); L.rect(t + height * 0.012, top, t + height * 0.035, deck_y + height * 0.25, color)
+        for k in range(4): L.rect(t - height * 0.035, top + k * height * 0.24, t + height * 0.035, top + k * height * 0.24 + height * 0.035, color)
+    def y(x):
+        if x <= tx[0]: u = (tx[0] - x) / max(1.0, tx[0] - x0); return top + (deck_y - top) * min(1, u) ** 1.4
+        if x >= tx[1]: u = (x - tx[1]) / max(1.0, x1 - tx[1]); return top + (deck_y - top) * min(1, u) ** 1.4
+        m = (tx[0] + tx[1]) / 2; u = (x - m) / (tx[1] - m); return (deck_y - height * 0.06) - ((deck_y - height * 0.06) - top) * u * u
+    L.line([(x, y(x)) for x in range(int(x0), int(x1) + 1, 3)], color, w)
+    return y
+
+# ------------------------------------------------------------ Sutro Tower above the fog, morning
+if want("sutro-tower"):
+    r = random.Random(41)
+    im = sky([(0, (28, 74, 150)), (0.45, (96, 150, 208)), (0.62, (196, 208, 222)), (0.7, (244, 222, 196)), (1, (236, 228, 226))])
+    im = glow(im, 250, 470, 240, (255, 226, 180), 0.6)
+    im = clouds(im, r, 5, 60, 240, 40, 18)
+    L = Lay(); C = (128, 150, 176, 255)                               # downtown's tallest tips, far off, clear of the fog
+    L.poly([(214, 470), (226, 396), (238, 470)], C); L.rect(224, 388, 228, 400, C)
+    L.rect(292, 404, 316, 470, C); L.ell(304, 404, 12, 14, C); L.rect(350, 428, 368, 470, C); L.rect(150, 436, 172, 470, C)
+    im = L.on(im, 0.6)
+    hill = [(x, 470 - 96 * math.exp(-((x - 820) / 210.0) ** 2) - 34 * math.exp(-((x - 1080) / 120.0) ** 2) + 3 * math.sin(x / 7.0)) for x in range(380, W + 20, 4)]
+    L = Lay(); L.poly([(380, 520)] + hill + [(W + 20, 520)], (44, 66, 74, 255)); im = L.on(im)
+    # The tower: three legs pinched at the waist, three platforms, three masts, banded red and white
+    cx, base, RED, WHT = 820, 378, (204, 62, 50, 255), (240, 240, 240, 255)
+    def leg(y): 
+        t = (base - y) / 230.0                                          # 0 at the foot, 1 at the top platform
+        return 46 - 30 * math.sin(min(1, t) * math.pi * 0.62) if t < 1 else 26
+    L = Lay()
+    bands = [(base, 320, RED), (320, 268, WHT), (268, 214, RED), (214, 148, WHT)]
+    for y0, y1, col in bands:
+        for side in (-1, 0, 1):
+            L.line([(cx + side * leg(y), y) for y in range(int(y0), int(y1) - 1, -4)] + [(cx + side * leg(y1), y1)], col, 4.2 if side else 3.2)
+        steps = 2
+        for k in range(steps):                                        # cross bracing
+            ya, yb_ = y0 + (y1 - y0) * k / steps, y0 + (y1 - y0) * (k + 1) / steps
+            L.line([(cx - leg(ya), ya), (cx + leg(yb_), yb_)], col, 1.2); L.line([(cx + leg(ya), ya), (cx - leg(yb_), yb_)], col, 1.2)
+    for y, wdt in [(322, 1.25), (238, 1.5), (150, 1.9)]: L.rect(cx - leg(y) * wdt - 4, y - 4, cx + leg(y) * wdt + 4, y + 4, WHT)
+    for dx, topy in [(-36, 70), (0, 44), (36, 70)]:
+        for k in range(6):
+            ya = 146 - k * (146 - topy) / 6.0; L.rect(cx + dx - 2.2, ya - (146 - topy) / 6.0, cx + dx + 2.2, ya, RED if k % 2 == 0 else WHT)
+    im = L.on(im)
+    # The sea of fog: bright where the sun reaches it, deeper blue toward the bottom
+    for base_y, amp, col, a, bl in [(452, 16, (248, 246, 244), 235, 9), (482, 18, (196, 208, 228), 245, 8), (520, 22, (140, 160, 198), 250, 7),
+                                    (570, 24, (92, 116, 162), 255, 6), (630, 20, (56, 78, 124), 255, 5), (690, 14, (32, 50, 90), 255, 4)]:
+        im = ridge(im, base_y, amp, col, r, rough=0.5, blur=bl, alpha=a)
+    save(im, "sutro-tower")
+
+# ------------------------------------------------------------ Palace of Fine Arts, afternoon
+if want("palace-of-fine-arts"):
+    r = random.Random(52)
+    im = sky([(0, (40, 96, 168)), (0.4, (116, 170, 216)), (0.62, (214, 220, 214)), (0.66, (236, 214, 180)), (1, (236, 214, 180))])
+    im = clouds(im, r, 6, 40, 230, 54, 16)
+    L = Lay(); G1, G2 = (30, 70, 52, 255), (20, 52, 42, 255)             # trees behind
+    for cxx, cyy, rad in [(120, 380, 130), (300, 400, 100), (460, 420, 70), (1060, 420, 76), (1200, 380, 130), (930, 430, 50), (590, 432, 46)]: canopy(L, r, cxx, cyy, rad, G1)
+    im = moved(L, -70).on(im)
+    B = Lay(); OCH, SHD, DARK, DOME = (222, 186, 140, 255), (184, 146, 108, 255), (70, 50, 48, 255), (196, 112, 70, 255)
+    cx, wl = 760, 470
+    def column(x, top, w=12):
+        B.rect(x - w / 2, top, x + w / 2, wl, OCH); B.rect(x + w / 2 - 3, top, x + w / 2, wl, SHD); B.rect(x - w / 2 - 2, top - 5, x + w / 2 + 2, top, OCH); B.rect(x - w / 2 - 2, wl - 5, x + w / 2 + 2, wl, OCH)
+    for side in (-1, 1):                                              # the colonnades to either side
+        x0 = cx + side * 150; x1 = cx + side * 440
+        for k in range(8): column(x0 + (x1 - x0) * k / 7.0, 372, 10)
+        B.rect(min(x0, x1) - 10, 356, max(x0, x1) + 10, 372, OCH); B.rect(min(x0, x1) - 10, 368, max(x0, x1) + 10, 372, SHD)
+        for k in range(4): bx = x0 + (x1 - x0) * (k + 0.5) / 4.0; B.rect(bx - 20, 336, bx + 20, 356, OCH); B.rect(bx - 20, 352, bx + 20, 356, SHD)
+    B.ell(cx, 236, 112, 100, DOME); B.rect(cx - 120, 236, cx + 120, 300, (0, 0, 0, 0))   # the dome, cut flat at its foot
+    B.d.rectangle([s(cx - 120), s(236), s(cx + 120), s(300)], fill=(0, 0, 0, 0))
+    B.ell(cx + 40, 200, 50, 46, (176, 96, 62, 255)); B.ell(cx - 6, 196, 96, 60, DOME)       # a shaded flank
+    B.rect(cx - 116, 232, cx + 116, 278, OCH); B.rect(cx - 116, 270, cx + 116, 278, SHD)   # the drum, with its panels
+    for k in range(-2, 3): B.rect(cx + k * 44 - 16, 240, cx + k * 44 + 16, 264, SHD)
+    B.rect(cx - 132, 278, cx + 132, 300, OCH); B.rect(cx - 132, 294, cx + 132, 300, SHD)   # entablature
+    B.rect(cx - 122, 300, cx + 122, wl, DARK)                                             # the open rotunda, in shadow
+    B.rect(cx - 50, 352, cx + 50, wl, (132, 170, 196, 255)); B.ell(cx, 352, 50, 50, (132, 170, 196, 255))  # sky through the far arch
+    B.rect(cx - 50, 440, cx + 50, wl, G2)
+    for x in (cx - 118, cx - 94, cx - 66, cx + 66, cx + 94, cx + 118): column(x, 300, 14)
+    B.rect(cx - 140, wl - 8, cx + 140, wl, OCH)
+    B = moved(B, -70); wl = 400
+    im = B.on(im)
+    # The lagoon, with the building mirrored in it
+    W0 = Lay()
+    for y in range(wl, H + 1, 2):
+        t = (y - wl) / float(H - wl); W0.rect(0, y, W, y + 2, lerp((70, 120, 132), (14, 40, 56), t) + (255,))
+    im = W0.on(im)
+    mirror = B.im.transpose(Image.FLIP_TOP_BOTTOM)
+    shifted = Image.new("RGBA", (W * SS, H * SS), (0, 0, 0, 0)); shifted.paste(mirror, (0, s(2 * wl - H)))
+    shifted.putalpha(shifted.getchannel("A").point(lambda a: int(a * 0.42)))
+    shifted = shifted.filter(ImageFilter.GaussianBlur(2.2 * SS))
+    keep = Image.new("L", (W * SS, H * SS), 0); ImageDraw.Draw(keep).rectangle([0, s(wl), W * SS, H * SS], fill=255)
+    im = Image.composite(Image.alpha_composite(im, shifted), im, keep)
+    L = Lay()
+    for _ in range(60):
+        y = r.uniform(wl + 6, H); x = r.uniform(0, W); wd = r.uniform(20, 90); L.rect(x, y, x + wd, y + 1.2, (200, 226, 232, 46))
+    canopy(L, r, 40, wl + 10, 110, G2); canopy(L, r, 1250, wl + 16, 110, G2); L.rect(0, wl - 4, 330, wl + 6, G2); L.rect(1190, wl - 4, W, wl + 6, G2)
+    im = L.on(im)
+    save(im, "palace-of-fine-arts")
+
+# ------------------------------------------------------------ Bay Bridge lights, night
+if want("bay-bridge"):
+    r = random.Random(63)
+    im = sky([(0, (4, 8, 26)), (0.5, (12, 24, 58)), (0.66, (34, 44, 86)), (0.67, (8, 16, 40)), (1, (2, 6, 18))])
+    im = stars(im, 240, r, H * 0.5)
+    im = glow(im, 1120, 470, 200, (255, 190, 120), 0.35)               # the city's glow at the far end
+    L = Lay(); C = (16, 24, 50, 255); rr = random.Random(9); x = 930
+    while x < W + 20:                                                 # the city at the bridge's foot
+        wd = rr.uniform(20, 44); h = rr.uniform(30, 150); L.rect(x, 470 - h, x + wd, 484, C); x += wd + rr.uniform(0, 6)
+    im = L.on(im); im = lights(im, r, 940, W, 340, 478, 190, (255, 214, 150))
+    deck, top, tw = 440, 190, [150, 560, 970]
+    def cable(x):
+        for a, b in zip(tw, tw[1:]):
+            if a <= x <= b: m = (a + b) / 2.0; u = (x - m) / (b - m); return (deck - 24) - ((deck - 24) - top) * u * u
+        e = tw[0] if x < tw[0] else tw[-1]; u = min(1, abs(x - e) / 300.0); return top + (deck - top) * u ** 1.4
+    L = Lay(); T = (22, 32, 60, 255)
+    for t in tw:                                                      # towers: two legs, cross braced
+        L.rect(t - 20, top - 10, t - 11, 560, T); L.rect(t + 11, top - 10, t + 20, 560, T)
+        for k in range(5):
+            y0 = top + k * 50; L.rect(t - 20, y0, t + 20, y0 + 6, T); L.line([(t - 16, y0 + 6), (t + 16, y0 + 50)], T, 1.6); L.line([(t + 16, y0 + 6), (t - 16, y0 + 50)], T, 1.6)
+    L.rect(-10, deck, W + 10, deck + 9, T); L.rect(-10, deck + 16, W + 10, deck + 20, T)
+    for x in range(-10, W + 10, 16): L.line([(x, deck + 9), (x + 8, deck + 16), (x + 16, deck + 9)], T, 1)
+    L.line([(x, cable(x)) for x in range(-20, W + 21, 5)], T, 2.4)
+    im = L.on(im)
+    bl = Image.new("RGB", (W * SS, H * SS), (0, 0, 0)); d = ImageDraw.Draw(bl)
+    for x in range(-10, W + 10, 13):                                  # a curtain of lights on the hanger ropes
+        if min(abs(x - t) for t in tw) < 22: continue
+        y = cable(x) + 4
+        while y < deck - 2:
+            b = r.choice([255, 255, 220, 170, 110, 60]); d.ellipse([s(x - 0.9), s(y - 0.9), s(x + 0.9), s(y + 0.9)], fill=(b, b, int(b * 0.96))); y += 8
+    for x in range(-20, W + 21, 9): yy = cable(x); d.ellipse([s(x - 1.1), s(yy - 1.1), s(x + 1.1), s(yy + 1.1)], fill=(255, 250, 235))
+    for x in range(0, W, 26): d.ellipse([s(x - 1), s(deck - 3), s(x + 1), s(deck - 1)], fill=(255, 200, 120))
+    for t in tw: d.ellipse([s(t - 2), s(top - 22), s(t + 2), s(top - 18)], fill=(255, 60, 50))
+    im = ImageChops.screen(ImageChops.screen(im.convert("RGB"), bl.filter(ImageFilter.GaussianBlur(3 * SS))), bl).convert("RGBA")
+    L = Lay()                                                         # light lying on the water
+    for _ in range(260):
+        x = r.uniform(0, W); y = r.uniform(476, 716); wd = r.uniform(6, 30) * (0.5 + (y - 470) / 250.0); a = int(110 * (1 - (y - 470) / 300.0))
+        L.rect(x, y, x + wd, y + 1.2, (255, 232, 190, max(20, a)) if x < 900 else (255, 200, 130, max(20, a)))
+    im = L.on(im, 0.5)
+    save(im, "bay-bridge")
+
+# ------------------------------------------------------------ The skyline from the water, night
+if want("skyline"):
+    r = random.Random(74)
+    im = sky([(0, (6, 8, 30)), (0.45, (22, 26, 70)), (0.64, (70, 52, 104)), (0.655, (10, 14, 40)), (1, (2, 4, 16))])
+    im = stars(im, 260, r, H * 0.42)
+    im = glow(im, 700, 470, 330, (150, 110, 190), 0.3)
+    wl = 470
+    def block(L, x0, x1, top, col, lit, step=7, win=(255, 220, 150)):
+        L.rect(x0, top, x1, wl, col)
+        for yy in range(int(top) + 6, wl - 4, step):
+            for xx in range(int(x0) + 4, int(x1) - 3, 6):
+                if r.random() < lit: L.rect(xx, yy, xx + 2.4, yy + 3, win + (r.choice([255, 220, 170]),))
+    L = Lay(); far, mid, near = (30, 32, 78, 255), (20, 22, 58, 255), (12, 14, 40, 255)
+    rr = random.Random(3); x = 200
+    while x < 1120: wd = rr.uniform(26, 60); block(L, x, x + wd, wl - rr.uniform(60, 190), far, 0.22); x += wd + rr.uniform(0, 10)
+    im = L.on(im)
+    L = Lay()
+    for x0, x1, top in [(250, 300, 300), (312, 372, 250), (392, 440, 320), (470, 540, 230), (700, 760, 270), (780, 850, 210), (930, 990, 290), (1010, 1070, 330), (870, 915, 300)]: block(L, x0, x1, top, mid, 0.36)
+    L.poly([(574, wl), (604, 150), (634, wl)], mid); L.rect(601, 122, 607, 156, mid)        # the pyramid
+    for yy in range(200, wl - 4, 9):
+        half = 30 * (yy - 150) / float(wl - 150)
+        for xx in range(int(604 - half) + 3, int(604 + half) - 2, 6):
+            if r.random() < 0.4: L.rect(xx, yy, xx + 2.2, yy + 3, (255, 220, 150, 230))
+    block(L, 646, 692, 150, near, 0.5, win=(236, 240, 255)); L.ell(669, 150, 23, 34, near)       # the tallest tower, round-topped
+    for k in range(7): L.rect(650, 124 + k * 5, 688, 126 + k * 5, (150, 190, 255, 200 - k * 20))
+    im = L.on(im); im = glow(im, 669, 132, 46, (120, 160, 255), 0.5)
+    L = Lay()                                                         # the waterfront: piers, and a clock tower
+    for x0, x1 in [(180, 330), (350, 470), (560, 690), (760, 900), (930, 1100)]: L.rect(x0, wl - 16, x1, wl, near)
+    L.rect(505, 372, 529, wl, (226, 214, 190, 255)); L.rect(501, 366, 533, 374, (240, 230, 206, 255)); L.rect(509, 344, 525, 366, (226, 214, 190, 255))
+    L.poly([(509, 344), (517, 322), (525, 344)], (226, 214, 190, 255)); L.ell(517, 392, 7, 7, (255, 240, 190, 255)); L.rect(430, wl - 24, 604, wl, (160, 150, 140, 255))
+    for xx in range(436, 600, 9): L.rect(xx, wl - 18, xx + 4, wl - 6, (255, 220, 150, 255))
+    im = L.on(im); im = glow(im, 517, 392, 30, (255, 220, 150), 0.6)
+    im = lights(im, r, 180, 1100, wl - 14, wl - 2, 110, (255, 214, 150))
+    L = Lay()
+    for _ in range(420):                                              # the city mirrored as streaks
+        x = r.gauss(650, 260); y = r.uniform(wl + 4, 716); wd = r.uniform(4, 22) * (0.5 + (y - wl) / 240.0)
+        col = r.choice([(255, 220, 150), (255, 220, 150), (150, 190, 255), (236, 240, 255)]); L.rect(x, y, x + wd, y + 1.2, col + (int(140 * (1 - (y - wl) / 290.0)),))
+    im = L.on(im, 0.5)
+    save(im, "skyline")
+
+# ------------------------------------------------------------ The Conservatory in Golden Gate Park, midday
+if want("conservatory"):
+    r = random.Random(85)
+    im = sky([(0, (36, 100, 182)), (0.4, (110, 172, 226)), (0.6, (196, 222, 236)), (1, (196, 222, 236))])
+    im = clouds(im, r, 7, 40, 250, 70, 14)
+    L = Lay(); G1, G2 = (36, 92, 60, 255), (24, 66, 48, 255)
+    for cxx, cyy, rad in [(90, 330, 150), (300, 360, 110), (470, 380, 60), (1050, 380, 70), (1200, 330, 150), (640, 380, 40), (880, 380, 40)]: canopy(L, r, cxx, cyy, rad, G1)
+    im = moved(L, -34).on(im)
+    L = Lay(); WH, SH, GL, FR = (246, 246, 240, 255), (204, 212, 214, 255), (170, 214, 226, 255), (228, 232, 230, 255)
+    cx, gy = 760, 424
+    for side in (-1, 1):                                              # the wings: a low wall of arched glass under a pitched glass roof
+        x0, x1 = cx + side * 70, cx + side * 300
+        a, b = min(x0, x1), max(x0, x1)
+        L.poly([(a - 6, 376), (a + 16, 340), (b - 16, 340), (b + 6, 376)], GL)
+        for k in range(1, 12): xx = a + (b - a) * k / 12.0; L.line([(xx, 376), (xx + (cx - xx) * 0.02, 340)], WH, 1.2)
+        L.rect(a - 8, 372, b + 8, 380, WH); L.rect(a, 380, b, gy, WH)
+        for k in range(9):
+            xx = a + 10 + (b - a - 20) * k / 8.0; L.rect(xx - 7, 394, xx + 7, gy - 4, GL); L.ell(xx, 394, 7, 7, GL)
+        ex = cx + side * 318                                           # an end pavilion with its own small dome
+        L.rect(ex - 30, 366, ex + 30, gy, WH); L.ell(ex, 366, 30, 26, GL); L.rect(ex - 32, 362, ex + 32, 370, WH); L.rect(ex - 2, 330, ex + 2, 344, WH)
+        for k in (-1, 0, 1): L.rect(ex + k * 18 - 6, 384, ex + k * 18 + 6, gy - 4, GL); L.ell(ex + k * 18, 384, 6, 6, GL)
+    L.rect(cx - 78, 330, cx + 78, gy, WH)                               # the central pavilion and its great dome
+    L.ell(cx, 322, 80, 92, GL); L.d.rectangle([s(cx - 90), s(322), s(cx + 90), s(420)], fill=WH)
+    L.rect(cx - 78, 330, cx + 78, gy, WH)
+    for k in range(-4, 5):                                            # ribs
+        L.line([(cx + k * 19, 322), (cx + k * 15, 268), (cx + k * 7, 236)], WH, 1.3)
+    for yy in (300, 272, 250): L.line([(cx - 80 * math.sqrt(max(0, 1 - ((322 - yy) / 92.0) ** 2)), yy), (cx + 80 * math.sqrt(max(0, 1 - ((322 - yy) / 92.0) ** 2)), yy)], WH, 1.2)
+    L.rect(cx - 84, 316, cx + 84, 332, WH); L.rect(cx - 84, 328, cx + 84, 332, SH)
+    L.rect(cx - 12, 214, cx + 12, 234, WH); L.ell(cx, 214, 12, 12, GL); L.rect(cx - 1.5, 186, cx + 1.5, 204, WH)   # the lantern on top
+    for k in range(-3, 4): L.rect(cx + k * 21 - 6, 346, cx + k * 21 + 6, 392, GL); L.ell(cx + k * 21, 346, 6, 6, GL)
+    L.rect(cx - 16, 386, cx + 16, gy, (120, 150, 160, 255)); L.ell(cx, 386, 16, 14, (120, 150, 160, 255))
+    L.rect(cx - 320, gy - 3, cx + 350, gy + 3, FR)
+    im = moved(L, -34).on(im); gy = 390
+    L = Lay()                                                         # the lawn, falling away toward us
+    for y in range(gy, H + 1, 2): t = (y - gy) / float(H - gy); L.rect(0, y, W, y + 2, lerp((92, 164, 84), (14, 54, 36), t ** 0.8) + (255,))
+    L.poly([(cx - 22, gy), (cx + 22, gy), (cx + 70, 560), (cx - 70, 560)], (214, 204, 184, 255))            # the steps and path
+    im = L.on(im)
+    L = Lay()                                                         # flower beds in arcs across the lawn
+    for arc, (ry, cols) in enumerate([(52, [(232, 64, 70), (250, 250, 240)]), (84, [(250, 196, 50), (236, 110, 60)]), (120, [(226, 90, 150), (250, 250, 240)])]):
+        for k in range(150):
+            a = math.pi * (0.06 + 0.88 * k / 149.0); side = -1 if k % 2 else 1
+            x = cx + (120 + arc * 150) * math.cos(a) * 1.15; y = gy + 24 + ry * math.sin(a) + r.uniform(-3, 3)
+            if abs(x - cx) < 80: continue
+            rad = 2.2 + arc * 0.9; L.ell(x + r.uniform(-4, 4), y, rad, rad * 0.8, r.choice(cols) + (255,))
+    for px, ph in [(330, 150), (1190, 150), (470, 110), (1050, 110)]:  # palms
+        L.rect(px - 3, gy + 16 - ph, px + 3, gy + 28, (88, 70, 54, 255))
+        for k in range(9):
+            a = -math.pi * (0.06 + 0.88 * k / 8.0); L.line([(px, gy + 16 - ph), (px + 34 * math.cos(a), gy + 16 - ph + 26 * math.sin(a) + 6), (px + 50 * math.cos(a), gy + 16 - ph + 24 * math.sin(a) + 26)], (30, 84, 56, 255), 3)
+    im = L.on(im)
+    save(im, "conservatory")
+
+# ------------------------------------------------------------ The windmill and poppies, Golden Gate Park, morning
+if want("windmill"):
+    r = random.Random(96)
+    im = sky([(0, (46, 104, 180)), (0.42, (126, 180, 226)), (0.6, (226, 226, 214)), (0.66, (250, 226, 190)), (1, (250, 226, 190))])
+    im = glow(im, 300, 430, 220, (255, 226, 170), 0.6)
+    im = clouds(im, r, 6, 50, 260, 64, 14)
+    L = Lay(); G1, G2 = (32, 78, 58, 255), (22, 58, 46, 255)            # wind-shaped cypress behind
+    for cxx, cyy, rad in [(60, 400, 120), (250, 420, 90), (420, 432, 60), (640, 436, 50), (1090, 420, 80), (1230, 396, 120), (540, 440, 44), (980, 436, 50)]: canopy(L, r, cxx, cyy, rad, G1)
+    im = L.on(im)
+    cx, base = 860, 478
+    L = Lay(); BODY, SHADE, TRIM, DARK = (116, 84, 62, 255), (84, 60, 48, 255), (240, 236, 226, 255), (52, 40, 38, 255)
+    L.poly([(cx - 62, base), (cx - 30, 262), (cx + 30, 262), (cx + 62, base)], BODY)        # the tapering shingled tower
+    L.poly([(cx + 16, base), (cx + 8, 262), (cx + 30, 262), (cx + 62, base)], SHADE)
+    for y in range(280, base, 13): half = 30 + 32 * (y - 262) / float(base - 262); L.line([(cx - half, y), (cx + half, y)], SHADE, 0.8)
+    L.rect(cx - 78, 392, cx + 78, 400, TRIM)                                                # the gallery and its rail
+    for k in range(-6, 7): L.rect(cx + k * 12.5 - 0.8, 376, cx + k * 12.5 + 0.8, 392, TRIM)
+    L.rect(cx - 78, 374, cx + 78, 377, TRIM)
+    for k in (-1, 1): L.line([(cx + k * 76, 400), (cx + k * 48, 430)], TRIM, 2)
+    for wy, ww in [(300, 8), (345, 9), (432, 11)]: L.rect(cx - ww, wy, cx + ww, wy + 2.4 * ww, TRIM); L.rect(cx - ww + 2.5, wy + 2.5, cx + ww - 2.5, wy + 2.4 * ww - 2.5, DARK)
+    L.rect(cx - 12, base - 34, cx + 12, base, TRIM); L.rect(cx - 9, base - 31, cx + 9, base, DARK)
+    L.poly(smooth([(cx - 36, 264), (cx - 34, 240), (cx - 14, 222), (cx + 14, 222), (cx + 34, 240), (cx + 36, 264)], 2), DARK)   # the cap
+    L.rect(cx - 38, 260, cx + 38, 266, TRIM)
+    im = L.on(im)
+    L = Lay(); hub = (cx, 244)                                        # four latticed sails
+    for k in range(4):
+        a = math.radians(32 + 90 * k); ux, uy = math.cos(a), math.sin(a); px_, py_ = -uy, ux
+        tip = (hub[0] + ux * 190, hub[1] + uy * 190)
+        L.line([hub, tip], TRIM, 3)
+        q = lambda d, o: (hub[0] + ux * d + px_ * o, hub[1] + uy * d + py_ * o)
+        L.line([q(34, 0), q(34, 30), q(188, 30), q(188, 0)], TRIM, 1.4)
+        for d in range(34, 189, 14): L.line([q(d, 0), q(d, 30)], TRIM, 1.0)
+        for o in (10, 20): L.line([q(34, o), q(188, o)], TRIM, 0.8)
+    L.ell(hub[0], hub[1], 6, 6, DARK)
+    im = L.on(im)
+    L = Lay()                                                         # the meadow
+    for y in range(470, H + 1, 2): t = (y - 470) / float(H - 470); L.rect(0, y, W, y + 2, lerp((96, 156, 76), (14, 50, 34), t ** 0.75) + (255,))
+    im = L.on(im)
+    im = ridge(im, 476, 8, (84, 146, 72), r, rough=0.4)
+    L = Lay()                                                         # poppies: small and many far off, larger up close
+    for _ in range(900):
+        t = r.random() ** 1.6; y = 486 + t * 234; x = r.uniform(-10, W + 10); sz = 1.6 + t * 9
+        col = r.choice([(255, 140, 20), (255, 122, 16), (255, 164, 40), (250, 104, 20)])
+        if sz > 5: L.line([(x, y), (x + r.uniform(-2, 2), y + sz * 2.2)], (40, 96, 50, 255), 1.0)
+        L.ell(x, y, sz, sz * 0.72, col + (255,)); L.ell(x, y - sz * 0.1, sz * 0.36, sz * 0.26, (220, 80, 10, 255))
+    im = L.on(im)
+    save(im, "windmill")
+
+# ------------------------------------------------------------ Lands End, sunset
+if want("lands-end"):
+    r = random.Random(107)
+    im = sky([(0, (40, 34, 90)), (0.3, (120, 62, 110)), (0.48, (232, 120, 84)), (0.565, (252, 196, 120)), (0.57, (190, 110, 104)), (1, (30, 30, 70))])
+    im = glow(im, 760, 400, 220, (255, 196, 120), 0.85)
+    L = Lay(); L.ell(760, 404, 34, 34, (255, 236, 196, 255)); im = L.on(im)
+    L = Lay()                                                         # the ocean
+    for y in range(408, H + 1, 2): t = (y - 408) / float(H - 408); L.rect(0, y, W, y + 2, lerp((176, 104, 104), (22, 26, 66), t ** 0.7) + (255,))
+    im = L.on(im)
+    im = ridge(im, 398, 14, (104, 60, 96), r, rough=0.4, blur=0.8)      # the Marin headlands across the strait
+    L = Lay(); mini_bridge(L, 900, 1290, 404, 70, (150, 52, 50, 255), towers=(0.22, 0.74)); im = L.on(im)
+    L = Lay()
+    for _ in range(150):
+        y = r.uniform(412, 700); spread = 20 + (y - 408) * 0.7; x = 760 + r.gauss(0, spread); wd = r.uniform(8, 40); L.rect(x - wd / 2, y, x + wd / 2, y + 1.3, (255, 206, 140, 150))
+    im = L.on(im, 0.5)
+    ROCK, ROCK2 = (40, 28, 50, 255), (24, 16, 34, 255)
+    L = Lay()                                                         # sea stacks, with foam at their feet
+    for sx, sy, sc in [(600, 470, 1.0), (680, 452, 0.6), (980, 520, 1.3), (1090, 500, 0.7)]:
+        L.poly(smooth(place([(-40, 0), (-30, -24), (-12, -44), (6, -38), (20, -52), (34, -28), (44, 0)], sx, sy, sc), 2), ROCK)
+        L.ell(sx, sy + 1, 54 * sc, 4 * sc, (250, 232, 220, 150))
+    im = L.on(im)
+    cliff = [(-10, 250), (60, 236), (150, 250), (230, 290), (300, 300), (360, 340), (410, 380), (450, 430), (500, 470), (540, 520), (600, 560), (640, 620), (700, 660), (760, 720)]
+    L = Lay(); L.poly(cliff + [(-10, 730)], ROCK); im = L.on(im)       # the headland we stand on
+    L = Lay(); L.poly([(-10, 430), (120, 420), (240, 470), (330, 540), (420, 600), (520, 690), (560, 730), (-10, 730)], ROCK2); im = L.on(im)
+    L = Lay()                                                         # foam along its foot
+    for k in range(40):
+        t = k / 39.0; x = 500 + t * 270 + r.uniform(-6, 6); y = 474 + t * 240 + r.uniform(-4, 4); L.ell(x + 14, y, r.uniform(10, 26), 3, (250, 232, 220, 130))
+    im = L.on(im, 1)
+    L = Lay()                                                         # cypress, blown flat by the sea wind
+    for tx, ty, sc in [(70, 240, 1.3), (170, 256, 1.0), (262, 298, 0.9), (336, 326, 0.7), (20, 250, 0.9)]:
+        L.line([(tx, ty + 6), (tx + 6 * sc, ty - 40 * sc), (tx + 22 * sc, ty - 76 * sc)], ROCK2, 4.5 * sc)
+        L.line([(tx + 8 * sc, ty - 46 * sc), (tx + 40 * sc, ty - 62 * sc)], ROCK2, 2.6 * sc)
+        for (ox, oy, rx, ry) in [(34, -88, 48, 13), (62, -78, 40, 10), (12, -98, 30, 10), (56, -66, 30, 8)]: L.ell(tx + ox * sc, ty + oy * sc, rx * sc, ry * sc, ROCK2)
+    im = L.on(im)
+    save(im, "lands-end")
+
+# ------------------------------------------------------------ Baker Beach, last light
+if want("baker-beach"):
+    r = random.Random(118)
+    im = sky([(0, (36, 40, 104)), (0.3, (110, 74, 136)), (0.46, (226, 124, 110)), (0.545, (250, 190, 130)), (0.55, (150, 100, 120)), (1, (30, 30, 60))])
+    im = glow(im, 330, 392, 240, (255, 190, 130), 0.8)
+    L = Lay()
+    for y in range(394, H + 1, 2): t = (y - 394) / float(H - 394); L.rect(0, y, W, y + 2, lerp((178, 116, 124), (40, 40, 84), t ** 0.6) + (255,))
+    im = L.on(im)
+    hl = [(x, 392 - 96 * math.exp(-((x - 250) / 230.0) ** 2) - 44 * math.exp(-((x - 560) / 130.0) ** 2) + 4 * math.sin(x / 23.0)) for x in range(-10, 800, 6)]
+    L = Lay(); L.poly([(-10, 396)] + hl + [(800, 396)], (84, 56, 104, 255)); im = L.on(im, 0.6)   # the Marin headlands
+    # The bridge, running away from us to the left: the near tower tall, the far one small
+    L = Lay(); OR, DK = (206, 70, 50, 255), (150, 46, 40, 255)
+    def deck(x): return 326 + (1300 - x) * 0.072
+    def tower(x, h, w):
+        b = deck(x) + h * 0.32
+        for sgn in (-1, 1): L.rect(x + sgn * w - w * 0.22, deck(x) - h, x + sgn * w + w * 0.22, b, OR)
+        for k in range(4): yy = deck(x) - h + k * h * 0.26; L.rect(x - w, yy, x + w, yy + h * 0.045, OR)
+    near, far = (1010, 230, 20), (690, 112, 10)
+    def cab(x):
+        nx, fx = near[0], far[0]; nt, ft = deck(nx) - near[1], deck(fx) - far[1]
+        if x >= nx: u = min(1, (x - nx) / 330.0); return nt + (deck(x) - 8 - nt) * u ** 1.3
+        if x <= fx: u = min(1, (fx - x) / 170.0); return ft + (deck(x) - 4 - ft) * u ** 1.3
+        u = (x - fx) / float(nx - fx); line = ft + (nt - ft) * u; sag = (deck(x) - 10 - line) * (1 - (2 * u - 1) ** 2); return line + sag
+    for x in range(520, W + 10, 9):
+        if min(abs(x - near[0]), abs(x - far[0])) > 12: L.line([(x, cab(x)), (x, deck(x))], (206, 80, 60, 170), 0.7)
+    L.line([(x, cab(x)) for x in range(516, W + 20, 4)], OR, 2.6)
+    L.poly([(500, deck(500)), (W + 10, deck(W + 10)), (W + 10, deck(W + 10) + 9), (500, deck(500) + 3)], OR)
+    L.poly([(500, deck(500) + 3), (W + 10, deck(W + 10) + 9), (W + 10, deck(W + 10) + 14), (500, deck(500) + 5)], DK)
+    tower(*far); tower(*near)
+    im = L.on(im)
+    L = Lay()                                                         # the Presidio bluff on our right, and cypress on it
+    bluff = [(880, 730), (930, 620), (980, 540), (1040, 470), (1100, 420), (1160, 388), (1230, 360), (1290, 350), (1290, 730)]
+    L.poly(smooth(bluff, 1), (34, 30, 54, 255))
+    for cxx, cyy, rad in [(1250, 344, 60), (1170, 378, 44), (1100, 414, 34)]: canopy(L, r, cxx, cyy, rad, (22, 24, 42, 255))
+    im = L.on(im)
+    L = Lay()                                                         # the sand, sweeping round from the left
+    sand = [(x, 600 - 0.00016 * (x - 1150) ** 2 + 40 * math.exp(-((x - 60) / 300.0) ** 2)) for x in range(-10, 1160, 10)]
+    L.poly(sand + [(1160, 730), (-10, 730)], (120, 86, 96, 255))
+    im = L.on(im)
+    L = Lay(); L.poly([(x, y + 46 + 0.02 * x) for x, y in sand] + [(1160, 730), (-10, 730)], (70, 50, 70, 255)); im = L.on(im, 6)
+    L = Lay()                                                         # waves sliding up it
+    for k, (off, a) in enumerate([(-58, 110), (-34, 150), (-12, 200), (-3, 235)]):
+        L.line([(x, y + off + 5 * math.sin(x / 60.0 + k * 1.7) + 3 * math.sin(x / 23.0 + k)) for x, y in sand], (250, 226, 214, a), 2.2 - k * 0.2)
+    for _ in range(120):
+        y = r.uniform(400, 560); x = r.uniform(0, 900); wd = r.uniform(10, 50); L.rect(x, y, x + wd, y + 1.2, (255, 206, 160, 70))
+    im = L.on(im, 0.7)
+    save(im, "baker-beach")
+
+# ------------------------------------------------------------ An afternoon game at the ballpark by the bay
+if want("ballpark"):
+    r = random.Random(129)
+    im = sky([(0, (34, 96, 180)), (0.3, (104, 166, 224)), (0.42, (190, 216, 234)), (1, (190, 216, 234))])
+    im = clouds(im, r, 6, 30, 170, 70, 14)
+    im = ridge(im, 236, 10, (96, 130, 150), r, rough=0.4, blur=1)       # the hills across the bay
+    L = Lay(); L.rect(0, 244, W, 330, (44, 104, 150, 255))              # the cove beyond right field
+    for _ in range(60): x = r.uniform(700, W); y = r.uniform(250, 300); L.rect(x, y, x + r.uniform(8, 30), y + 1, (190, 220, 240, 110))
+    for bx, by, sz in [(830, 276, 0.5), (960, 262, 0.4), (1100, 284, 0.6), (1210, 268, 0.45)]:
+        L.poly([(bx, by), (bx, by - 40 * sz), (bx + 18 * sz, by - 3 * sz)], (246, 248, 250, 255)); L.poly([(bx - 16 * sz, by), (bx + 20 * sz, by), (bx + 14 * sz, by + 6 * sz), (bx - 12 * sz, by + 6 * sz)], (30, 50, 70, 255))
+    im = L.on(im)
+    arc = lambda x: 560 - 250 * math.sqrt(max(0.0, 1 - ((x - 640) / 760.0) ** 2))            # the outfield fence
+    L = Lay(); ST, ST2, WALL, BRICK = (70, 90, 110, 255), (54, 70, 90, 255), (18, 62, 44, 255), (150, 74, 54, 255)
+    for k in range(7):                                                # bleachers, left and center
+        L.poly([(-10, arc(-10) - 14 - k * 13)] + [(x, arc(x) - 14 - k * 13) for x in range(0, 700, 20)] + [(700, arc(700) - 14 - (k + 1) * 13)] + [(x, arc(x) - 14 - (k + 1) * 13) for x in range(680, -30, -20)], ST if k % 2 else ST2)
+    for _ in range(900):                                              # the crowd
+        x = r.uniform(0, 690); k = r.uniform(0, 7); L.ell(x, arc(x) - 18 - k * 13, 1.5, 1.5, r.choice([(236, 120, 40), (240, 240, 240), (30, 30, 30), (236, 120, 40), (200, 170, 140)]) + (255,))
+    L.rect(520, 150, 760, 250, (22, 30, 40, 255)); L.rect(526, 156, 754, 244, (34, 48, 62, 255))        # the scoreboard, blank
+    for (x0, y0, x1, y1, c) in [(536, 166, 640, 206, (60, 110, 80)), (650, 166, 744, 184, (200, 120, 50)), (650, 190, 744, 206, (80, 96, 120)), (536, 214, 744, 234, (50, 66, 84))]: L.rect(x0, y0, x1, y1, c + (255,))
+    L.rect(560, 250, 572, 300, (22, 30, 40, 255)); L.rect(708, 250, 720, 300, (22, 30, 40, 255))
+    L.poly([(700, arc(700) - 44)] + [(x, arc(x) - 44) for x in range(720, W + 20, 20)] + [(x, arc(x)) for x in range(W + 10, 690, -20)], BRICK)   # the tall brick wall in right
+    for x in range(730, W, 46): yy = arc(x); L.rect(x, yy - 30, x + 22, yy - 4, (60, 34, 34, 255)); L.ell(x + 11, yy - 30, 11, 9, (60, 34, 34, 255))
+    L.poly([(-10, arc(-10) - 14)] + [(x, arc(x) - 14) for x in range(0, 720, 20)] + [(x, arc(x)) for x in range(700, -30, -20)], WALL)                # the fence in left and center
+    for lx in (150, 1130):                                            # light towers
+        L.rect(lx - 4, 170, lx + 4, 330, (60, 70, 84, 255)); L.rect(lx - 46, 146, lx + 46, 194, (50, 60, 74, 255))
+        for i in range(6):
+            for j in range(3): L.ell(lx - 37 + i * 15, 156 + j * 14, 4, 4, (250, 250, 236, 255))
+    L.poly(smooth(place([(-22, 10), (-26, -14), (-18, -30), (-10, -16), (-8, -36), (0, -18), (4, -36), (12, -16), (18, -28), (24, -6), (20, 14), (0, 22)], 330, 232, 1.5), 2), (140, 86, 50, 255))   # a giant glove
+    L.rect(326, 262, 334, 300, (60, 70, 84, 255))
+    L.rect(88, 190, 92, 320, (250, 214, 60, 255)); L.rect(1188, 150, 1192, 300, (250, 214, 60, 255))    # foul poles
+    im = L.on(im)
+    L = Lay(); GA, GB, DIRT = (58, 142, 70, 255), (48, 126, 62, 255), (176, 124, 84, 255)
+    L.poly([(x, arc(x)) for x in range(-10, W + 20, 10)] + [(W + 10, 730), (-10, 730)], GA)              # the outfield, mown in bands
+    for k in range(0, 9, 2):
+        a0, a1 = math.radians(206 + k * 14), math.radians(206 + (k + 1) * 14)
+        L.poly([(640, 690), (640 + 1400 * math.cos(a0), 690 + 700 * math.sin(a0)), (640 + 1400 * math.cos(a1), 690 + 700 * math.sin(a1))], GB)
+    im2 = L.on(Image.new("RGBA", (W * SS, H * SS), (0, 0, 0, 0)))
+    mask = Lay(); mask.poly([(x, arc(x)) for x in range(-10, W + 20, 10)] + [(W + 10, 730), (-10, 730)], (255, 255, 255, 255))
+    im = Image.composite(Image.alpha_composite(im, im2), im, mask.im.getchannel("A"))
+    L = Lay()
+    L.ell(640, 600, 250, 100, DIRT)                                    # the infield
+    L.poly([(640, 664), (790, 596), (640, 536), (490, 596)], GA)
+    L.line([(640, 672), (240, 490)], (250, 250, 250, 255), 1.6); L.line([(640, 672), (1040, 490)], (250, 250, 250, 255), 1.6)
+    L.ell(640, 602, 16, 7, DIRT); L.rect(636, 600, 644, 602, (250, 250, 250, 255)); L.ell(640, 672, 34, 14, DIRT)
+    for bx, by in [(790, 596), (640, 536), (490, 596)]: L.poly([(bx - 6, by), (bx, by - 3), (bx + 6, by), (bx, by + 3)], (250, 250, 250, 255))
+    L.poly([(634, 672), (640, 669), (646, 672), (640, 676)], (250, 250, 250, 255))
+    for px, py in [(640, 598), (700, 560), (580, 560), (790, 580), (492, 580), (420, 440), (640, 410), (880, 440), (640, 660), (652, 668)]:   # players
+        L.ell(px, py - 9, 2.6, 2.6, (240, 240, 240, 255)); L.rect(px - 2.4, py - 7, px + 2.4, py, (240, 240, 240, 255) if py != 660 else (60, 60, 60, 255))
+    im = L.on(im)
+    L = Lay()                                                         # the rows of seats below us
+    for k in range(4):
+        y = 664 + k * 16; L.poly([(-10, y + 20 * math.cos(0)), (640, y - 12), (W + 10, y + 20), (W + 10, 730), (-10, 730)], (16 + k * 2, 44 - k * 6, 36 - k * 4, 255))
+    for _ in range(260): x = r.uniform(0, W); k = r.randrange(0, 4); y = 664 + k * 16 + 20 * abs(x - 640) / 650.0 * 1.6 - 8; L.ell(x, y, 3, 3, r.choice([(236, 120, 40), (30, 30, 30), (200, 200, 200)]) + (255,))
+    im = L.on(im)
+    save(im, "ballpark")

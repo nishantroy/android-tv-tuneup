@@ -37,7 +37,8 @@ import java.util.concurrent.Executors;
  * this TV's GPU cannot afford; a wallpaper does not move, so it is blurred once here and
  * {@link Glass} draws the matching slice of that.
  *
- * Pictures come from the app's assets and from a folder the owner can add to:
+ * Pictures come from the app's assets, unless the owner has put their own in this folder, in
+ * which case only those are shown:
  * /sdcard/Android/data/local.tvhome/files/wallpapers
  *
  * A picture's name can say when it suits, as extra dot-separated words before the extension:
@@ -119,8 +120,12 @@ final class Backdrop extends View {
                 : hour >= 5 && hour < 8 ? "dawn" : hour >= 8 && hour < 16 ? "day" : hour >= 16 && hour < 20 ? "dusk" : "night";
         String sky = weather == null ? null : weather.icon() == Icon.FOG ? "fog" : weather.icon() == Icon.RAIN ? "rain"
                 : weather.icon() == Icon.SNOW ? "snow" : null;
+        // Pictures the owner added replace the built-in ones; those are only the fallback.
+        List<String> pool = new ArrayList<>();
+        for (String source : sources) if (!source.startsWith("asset:")) pool.add(source);
+        if (pool.isEmpty()) pool = sources;
         List<String> timely = new ArrayList<>(), forSky = new ArrayList<>();
-        for (String source : sources) {
+        for (String source : pool) {
             String name = source.substring(source.lastIndexOf('/') + 1).toLowerCase();
             List<String> words = Arrays.asList(name.split("\\."));
             words = words.subList(Math.min(1, words.size()), Math.max(1, words.size() - 1)); // drop the name and the extension
@@ -129,7 +134,7 @@ final class Backdrop extends View {
             for (String t : TIMES) timed |= words.contains(t);
             if (!timed || words.contains(time)) timely.add(source);
         }
-        return !forSky.isEmpty() ? forSky : !timely.isEmpty() ? timely : sources;
+        return !forSky.isEmpty() ? forSky : !timely.isEmpty() ? timely : pool;
     }
 
     private static boolean isPicture(String name) {

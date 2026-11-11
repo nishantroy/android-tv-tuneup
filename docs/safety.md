@@ -107,8 +107,9 @@ Verified on the test TV:
   screen allows.
 - The wallpaper and glass panels on Home, the ambient screen (entered directly and left with
   one key press), the ambient screen as the system screensaver including one change of
-  picture, weather for one place in clear conditions, and each bundled and San Francisco
-  picture behind the launcher.
+  picture, weather for one place in clear conditions, each bundled picture and ten of the
+  fourteen San Francisco pictures behind the launcher, and pictures copied to the TV taking
+  the place of the built-in ones.
 - The carousel reordering after an app is opened, with the grid keeping its order.
 - Now Playing with one app, Spotify: the card appeared with artwork, title and artist, and
   OK paused and resumed playback.
@@ -123,6 +124,8 @@ Not verified:
 - The grid tile that switches the carousel between recent-first and grid order (it appears;
   pressing it was not exercised).
 - The ambient screen arriving by itself after a minute idle (it was only entered directly).
+- Four of the San Francisco pictures on the TV itself (Bay Bridge, skyline, Lands End and
+  Baker Beach); they were only checked as pictures.
 - The grid tile that switches between wallpaper and the plain backdrop.
 - Pictures being chosen for dawn, dusk, night or fog: only the daytime choice was seen.
 - Weather over more than an hour, in conditions other than clear, or in Celsius.

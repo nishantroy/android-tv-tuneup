@@ -28,6 +28,7 @@ installing an app.
 | Stock home screen disabled | `scripts/remove-launcher.sh <tv>`, or on the TV: Settings → Apps → See All Apps → Disabled Apps → Android TV Home → Enable |
 | Launcher installed and set as Home | `scripts/remove-launcher.sh <tv>` |
 | Quick Start, animation scales, wifi | The TV's own Settings |
+| Now Playing listener enabled (optional) | `adb shell cmd notification disallow_listener local.tvhome/local.tvhome.MediaListener`, or uninstalling the launcher |
 
 The remove-and-restore path and the switch to the launcher and back were each run on the test
 TV and worked. A factory reset returns the TV to how it shipped regardless.
@@ -47,13 +48,20 @@ TV and worked. A factory reset returns the TV to how it shipped regardless.
 
 ## Privacy and network behaviour of the launcher
 
-- It keeps one small settings file on the TV: the order of your apps and which you removed
-  from Home.
+- It keeps one small settings file on the TV: the order of your apps, which you removed from
+  Home, and when you last opened each one from the launcher (for the carousel's order).
 - With the `READ_TV_LISTINGS` permission it reads the TV's Watch Next list, which is what the
   stock home's Play Next row showed. That list never leaves the TV.
 - Its only network use is downloading the artwork for Continue Watching, from the addresses
   the streaming apps themselves put in that list. Those servers see a request for an image,
   as they did when the stock home showed the same row.
+- Now Playing is off unless you enable it. Enabling it makes the launcher a notification
+  listener, which is the only way Android lets an app see what is playing. That permission
+  would also let an app read every notification on the TV. The launcher's listener is an
+  empty class (`MediaListener.java`, a few lines, worth reading) and looks at none of them; it
+  uses the access only to read the title, artist and artwork of the current media session
+  and to send it play and pause. Artwork given as a web address is downloaded from that
+  address.
 - It has no analytics, no account, no ads, and contacts no server belonging to this project.
 
 ## Legal notes
@@ -82,12 +90,19 @@ Verified on the test TV:
 - One sleep and wake cycle with Quick Start on: about 1.4 seconds to wake, network back
   within about five seconds.
 - Frame times while the carousel slides: a 12 to 13 ms median, measured with `dumpsys gfxinfo`.
+- The carousel reordering after an app is opened, with the grid keeping its order.
+- Now Playing with one app, Spotify: the card appeared with artwork, title and artist, and
+  OK paused and resumed playback.
 
 Not verified:
 
 - **Any other TV model, brand or Android version.**
 - Holding OK on a physical remote to open an app's options. It relies on Android's standard
   long-press and was only exercised through the Menu key.
+- Holding OK on the Now Playing card to open the app that is playing, for the same reason.
+- Now Playing with any app other than Spotify.
+- The grid tile that switches the carousel between recent-first and grid order (it appears;
+  pressing it was not exercised).
 - Voice search and Google Assistant after the removals.
 - Casting to the TV after the removals.
 - Switching to an HDMI input from the Inputs menu (the menu opens; no input was selected).

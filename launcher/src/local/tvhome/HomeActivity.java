@@ -14,8 +14,12 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.Bitmap;
 import android.graphics.drawable.GradientDrawable;
+import android.media.MediaMetadata;
+import android.media.session.MediaController;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -62,8 +66,12 @@ public class HomeActivity extends Activity implements Carousel.Host {
     private static final int COLS = 5, VISIBLE_ROWS = 3, MAX_CONTINUE = 12;
     // Stage rhythm (dp from the top): header, carousel band, app name, Continue Watching.
     private static final float HEADER_TOP = 38, FLOW_TOP = 109, FLOW_HEIGHT = 200, CONTINUE_TOP = 346;
+    /** The Now Playing card: as tall as the date and clock opposite it. */
+    private static final float NOW_HEIGHT = 64, NOW_TEXT_WIDTH = 200;
     private static final String K_FAVS = "favs", K_KNOWN = "known", K_COACH = "coach", K_LAST = "last";
-    private static final String TAG_ADD = "+", TAG_STORE = "store";
+    private static final String TAG_ADD = "+", TAG_STORE = "store", TAG_ORDER = "order";
+    /** Carousel in most-recently-opened order (default), or the order of the grid. */
+    private static final String K_RECENT_FIRST = "recentFirst", K_OPENED = "opened:";
     private static final String PLAY_STORE = "com.android.vending";
     /** `am start -n local.tvhome/.HomeActivity --ez demo true` turns demo mode on; false turns it off. */
     private static final String EXTRA_DEMO = "demo";
@@ -108,12 +116,23 @@ public class HomeActivity extends Activity implements Carousel.Host {
     private GridLayout favGrid, pickGrid;
     private ScrollView favScroll, pickScroll;
     private App sheetApp;
+    private NowPlaying nowPlaying;
+    private MediaController playing;
+    private LinearLayout nowCard;
+    private ImageView nowArt;
+    private TextView nowTitle, nowDetail;
+    private Icon nowGlyph;
+    private String nowKey;
+    private int nowColor;
+    private boolean hintShowing;
+    private String stripSig;
     private ConnectivityManager.NetworkCallback netCallback;
 
     private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             dropCache = true;
+            stripSig = null; // artwork may have changed: rebuild the carousel too
             reload();
         }
     };
@@ -150,11 +169,14 @@ public class HomeActivity extends Activity implements Carousel.Host {
         f.addDataScheme("package");
         registerReceiver(packageReceiver, f);
         watchNetwork();
+        nowPlaying = new NowPlaying(this, ui, this::showNowPlaying);
+        nowPlaying.start();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        nowPlaying.start(); // re-reads what is playing; also picks up a listener enabled since launch
         reload();
         if (!firstRender) {
             rise(gridOpen ? favScroll : stage, 10, Ui.BASE);
@@ -182,6 +204,7 @@ public class HomeActivity extends Activity implements Carousel.Host {
     @Override
     protected void onDestroy() {
         unregisterReceiver(packageReceiver);
+        nowPlaying.stop();
         if (netCallback != null) {
             getSystemService(ConnectivityManager.class).unregisterNetworkCallback(netCallback);
         }
@@ -304,8 +327,11 @@ public class HomeActivity extends Activity implements Carousel.Host {
         // Actions, top right, sharing the header's top line.
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
+        actions.setGravity(Gravity.TOP); // the Now Playing card is taller than the pills beside it
         actions.setClipChildren(false);
+        // Room on the left for the first control to grow into when focused.
+        actions.setPadding(Ui.dp(10), 0, 0, 0);
+        actions.setClipToPadding(false);
         netBadge = new LinearLayout(this);
         netBadge.setGravity(Gravity.CENTER_VERTICAL);
         ImageView netIcon = new ImageView(this);
@@ -315,7 +341,9 @@ public class HomeActivity extends Activity implements Carousel.Host {
         netText.setPadding(Ui.dp(8), 0, Ui.dp(8), 0);
         netBadge.addView(netText);
         netBadge.setVisibility(View.GONE);
+        netBadge.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(36)));
         actions.addView(netBadge);
+        actions.addView(buildNowPlayingCard());
         firstPill = pill(Icon.INPUT, "Inputs", v -> openInputs());
         actions.addView(firstPill);
         actions.addView(pill(Icon.SETTINGS, "Settings", v -> start(new Intent(Settings.ACTION_SETTINGS), null)));
@@ -553,6 +581,138 @@ public class HomeActivity extends Activity implements Carousel.Host {
         lp.leftMargin = Ui.dp(10);
         p.setLayoutParams(lp);
         return p;
+    }
+
+    // ---------------------------------------------------------------- now playing
+
+    /**
+     * A card in the header for whatever is playing in the background: artwork, title, artist,
+     * and a play or pause button. OK toggles playback; holding OK opens the app that is playing.
+     * It is as tall as the clock block opposite, and lights the room in its artwork's color.
+     */
+    private View buildNowPlayingCard() {
+        nowCard = new LinearLayout(this);
+        nowCard.setOrientation(LinearLayout.HORIZONTAL);
+        nowCard.setGravity(Gravity.CENTER_VERTICAL);
+        nowCard.setPadding(Ui.dp(8), 0, Ui.dp(12), 0);
+        nowCard.setFocusable(true);
+        nowCard.setClickable(true);
+
+        nowArt = new ImageView(this);
+        nowArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        nowArt.setBackgroundColor(Ui.SURFACE);
+        Ui.clipRound(nowArt, 9);
+        nowCard.addView(nowArt, new LinearLayout.LayoutParams(Ui.dp(48), Ui.dp(48)));
+
+        LinearLayout words = new LinearLayout(this);
+        words.setOrientation(LinearLayout.VERTICAL);
+        nowTitle = Ui.text(this, "", 15, 600, Ui.TEXT);
+        nowTitle.setSingleLine(true);
+        nowTitle.setEllipsize(TextUtils.TruncateAt.END);
+        nowTitle.setMarqueeRepeatLimit(-1);
+        words.addView(nowTitle);
+        nowDetail = Ui.text(this, "", 13, 400, Ui.TEXT_SECONDARY);
+        nowDetail.setSingleLine(true);
+        nowDetail.setEllipsize(TextUtils.TruncateAt.END);
+        nowDetail.setPadding(0, Ui.dp(4), 0, 0);
+        words.addView(nowDetail);
+        LinearLayout.LayoutParams wordsLp = new LinearLayout.LayoutParams(Ui.dp(NOW_TEXT_WIDTH),
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        wordsLp.setMargins(Ui.dp(12), 0, Ui.dp(12), 0);
+        nowCard.addView(words, wordsLp);
+
+        nowGlyph = new Icon(Icon.PAUSE, Ui.TEXT);
+        ImageView button = new ImageView(this);
+        button.setImageDrawable(nowGlyph);
+        button.setPadding(Ui.dp(9), Ui.dp(9), Ui.dp(9), Ui.dp(9));
+        nowCard.addView(button, new LinearLayout.LayoutParams(Ui.dp(34), Ui.dp(34)));
+
+        View.OnFocusChangeListener style = (v, focused) -> {
+            nowCard.setBackground(focused ? Ui.shape(Color.WHITE, 16, 0, 0) : Ui.shape(Ui.GLASS, 16, 0.5f, Ui.HAIRLINE));
+            nowTitle.setTextColor(focused ? Ui.ON_LIGHT : Ui.TEXT);
+            nowDetail.setTextColor(focused ? Ui.ON_LIGHT_SECONDARY : Ui.TEXT_SECONDARY);
+            nowGlyph.setColor(focused ? Ui.ON_LIGHT : Ui.TEXT);
+            button.setBackground(Ui.shape(focused ? 0x14000000 : 0x1FFFFFFF, 17, 0, 0));
+            nowTitle.setEllipsize(focused ? TextUtils.TruncateAt.MARQUEE : TextUtils.TruncateAt.END);
+            nowTitle.setSelected(focused);
+            float s = focused ? 1.03f : 1f;
+            nowCard.animate().scaleX(s).scaleY(s).setDuration(Ui.FAST).setInterpolator(Ui.STANDARD).start();
+            if (focused) {
+                if (nowColor != 0) spotlight(nowCard, nowColor, 0.5f);
+                else ambient(nowCard, 0.45f);
+            }
+        };
+        style.onFocusChange(nowCard, false);
+        nowCard.setOnFocusChangeListener(style);
+        nowCard.setOnClickListener(v -> {
+            if (playing == null) return;
+            if (NowPlaying.isPlaying(playing)) playing.getTransportControls().pause();
+            else playing.getTransportControls().play();
+        });
+        nowCard.setOnLongClickListener(v -> {
+            App owner = playing != null ? appForPackage(playing.getPackageName()) : null;
+            if (owner != null) launch(owner, null);
+            return true;
+        });
+        nowCard.setVisibility(View.GONE);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(NOW_HEIGHT));
+        lp.rightMargin = Ui.dp(6); // it grows when focused; keep it clear of the pill beside it
+        nowCard.setLayoutParams(lp);
+        return nowCard;
+    }
+
+    private void showNowPlaying(MediaController controller) {
+        playing = controller;
+        MediaMetadata m = controller != null ? controller.getMetadata() : null;
+        String title = m != null ? NowPlaying.title(m) : null;
+        if (title == null) {
+            nowKey = null;
+            syncNowCard();
+            return;
+        }
+        App owner = appForPackage(controller.getPackageName());
+        String artist = NowPlaying.artist(m);
+        String album = m.getString(MediaMetadata.METADATA_KEY_ALBUM);
+        String detail = artist != null && album != null && !album.isEmpty() && !album.equals(title)
+                ? artist + "  ·  " + album
+                : artist != null ? artist : owner != null ? owner.label : "";
+        nowTitle.setText(title);
+        nowDetail.setText(detail);
+        nowCard.setContentDescription("Now playing: " + title + (artist != null ? ", " + artist : ""));
+        nowGlyph.setType(NowPlaying.isPlaying(controller) ? Icon.PAUSE : Icon.OPEN);
+
+        // Playback state changes arrive far more often than the track does: only touch the
+        // artwork, and work out its color, when the track is a different one.
+        String key = controller.getPackageName() + '|' + title + '|' + artist;
+        if (!key.equals(nowKey)) {
+            nowKey = key;
+            Bitmap art = m.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
+            if (art == null) art = m.getBitmap(MediaMetadata.METADATA_KEY_ART);
+            if (art == null) art = m.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
+            String artUri = m.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI);
+            if (artUri == null) artUri = m.getString(MediaMetadata.METADATA_KEY_ART_URI);
+            if (artUri == null) artUri = m.getString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI);
+            nowArt.setTag(null);
+            if (art != null) {
+                nowArt.setImageBitmap(art);
+                nowColor = Ui.signatureColor(new BitmapDrawable(getResources(), art));
+            } else if (artUri != null) {
+                Images.into(nowArt, Uri.parse(artUri), Ui.dp(48));
+                nowColor = owner != null ? owner.color : 0;
+            } else {
+                nowArt.setImageDrawable(owner != null ? owner.artCopy() : null);
+                nowColor = owner != null ? owner.color : 0;
+            }
+            if (nowCard.isFocused() && nowColor != 0) spotlight(nowCard, nowColor, 0.5f);
+        }
+        syncNowCard();
+    }
+
+    /** The card shows while there is something to show, and steps aside for the hint above it. */
+    private void syncNowCard() {
+        boolean show = nowKey != null && !hintShowing;
+        if (!show && nowCard.isFocused()) firstPill.requestFocus();
+        nowCard.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     // ---------------------------------------------------------------- focusable pieces
@@ -1068,8 +1228,21 @@ public class HomeActivity extends Activity implements Carousel.Host {
         for (App a : apps.values()) if (!shown.contains(a.key)) addable.add(a);
         Collections.sort(addable, (x, y) -> x.label.compareToIgnoreCase(y.label));
 
-        StringBuilder sig = new StringBuilder(String.valueOf(movingKey));
+        // The carousel shows the same apps as the grid, optionally most recently opened first.
+        SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        boolean recentFirst = prefs.getBoolean(K_RECENT_FIRST, true);
+        List<App> strip = new ArrayList<>();
+        for (String k : shown) strip.add(apps.get(k));
+        if (recentFirst) {
+            // A stable sort: apps never opened keep their grid order, after the ones that were.
+            Collections.sort(strip, (x, y) -> Long.compare(
+                    prefs.getLong(K_OPENED + y.key, 0), prefs.getLong(K_OPENED + x.key, 0)));
+        }
+
+        StringBuilder sig = new StringBuilder(String.valueOf(movingKey)).append(recentFirst);
         for (String k : shown) sig.append('|').append(k);
+        sig.append("||");
+        for (App a : strip) sig.append('|').append(a.key);
         sig.append("||");
         for (App a : addable) sig.append('|').append(a.key);
         if (!force && sig.toString().equals(renderedSig)) return;
@@ -1079,12 +1252,16 @@ public class HomeActivity extends Activity implements Carousel.Host {
         Object focusTag = movingKey != null ? movingKey : focus != null ? focus.getTag() : null;
         boolean focusWasInGrid = focus instanceof Cell;
 
-        // Carousel: same apps, same order.
-        List<App> strip = new ArrayList<>();
-        for (String k : shown) strip.add(apps.get(k));
-        App centered = flow.selected();
-        flow.setApps(strip, centered != null ? centered.key
-                : getPreferences(MODE_PRIVATE).getString(K_LAST, null));
+        StringBuilder order = new StringBuilder();
+        for (App a : strip) order.append(a.key).append('|');
+        if (!order.toString().equals(stripSig)) {
+            stripSig = order.toString();
+            App centered = flow.selected();
+            // Recent-first puts the app just used in the middle; otherwise stay where we were.
+            String keep = recentFirst && !strip.isEmpty() ? strip.get(0).key
+                    : centered != null ? centered.key : prefs.getString(K_LAST, null);
+            flow.setApps(strip, keep);
+        }
         if (strip.isEmpty()) nameLabel.setText("");
 
         favGrid.removeAllViews();
@@ -1101,6 +1278,14 @@ public class HomeActivity extends Activity implements Carousel.Host {
         Cell add = new Cell(null, TAG_ADD, Icon.PLUS, "Add app", true);
         add.setOnClickListener(v -> showPicker(true));
         favGrid.addView(add);
+        Cell sort = new Cell(null, TAG_ORDER, Icon.SORT,
+                recentFirst ? "Carousel: recent first" : "Carousel: this order", true);
+        sort.setOnClickListener(v -> {
+            prefs.edit().putBoolean(K_RECENT_FIRST, !recentFirst).apply();
+            render(true);
+            focusTag(favGrid, TAG_ORDER);
+        });
+        favGrid.addView(sort);
 
         pickGrid.removeAllViews();
         Cell store = new Cell(null, TAG_STORE, Icon.DOWNLOAD, "Get more apps", true);
@@ -1205,6 +1390,8 @@ public class HomeActivity extends Activity implements Carousel.Host {
     private void showHint(String text, boolean stay) {
         ui.removeCallbacks(hideHintLater);
         hintPill.setText(text);
+        hintShowing = true;
+        syncNowCard();
         hintPill.animate().alpha(1f).setDuration(Ui.BASE).start();
         if (!stay) ui.postDelayed(hideHintLater, 6000);
     }
@@ -1212,6 +1399,8 @@ public class HomeActivity extends Activity implements Carousel.Host {
     private void hideHint() {
         ui.removeCallbacks(hideHintLater);
         hintPill.animate().alpha(0f).setDuration(Ui.FAST).start();
+        hintShowing = false;
+        syncNowCard();
     }
 
     private final Runnable hideHintLater = this::hideHint;
@@ -1368,6 +1557,7 @@ public class HomeActivity extends Activity implements Carousel.Host {
     // ---------------------------------------------------------------- actions
 
     private void launch(App a, View from) {
+        getPreferences(MODE_PRIVATE).edit().putLong(K_OPENED + a.key, System.currentTimeMillis()).apply();
         Intent i = new Intent(Intent.ACTION_MAIN)
                 .addCategory(a.leanback ? Intent.CATEGORY_LEANBACK_LAUNCHER : Intent.CATEGORY_LAUNCHER)
                 .setComponent(a.cn)
@@ -1377,6 +1567,10 @@ public class HomeActivity extends Activity implements Carousel.Host {
 
     /** Opens a Watch Next entry through the deep link its app published. */
     private void resume(WatchNext.Item item, View from) {
+        App resumed = appForPackage(item.pkg);
+        if (resumed != null) {
+            getPreferences(MODE_PRIVATE).edit().putLong(K_OPENED + resumed.key, System.currentTimeMillis()).apply();
+        }
         try {
             if (item.intentUri == null) throw new java.net.URISyntaxException("", "sample entry");
             start(Intent.parseUri(item.intentUri, Intent.URI_INTENT_SCHEME), from);

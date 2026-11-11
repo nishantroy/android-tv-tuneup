@@ -11,9 +11,9 @@ import android.graphics.drawable.Drawable;
 /** A small family of line icons drawn on a 24-unit grid with one stroke weight. */
 final class Icon extends Drawable {
     static final int PLUS = 0, INPUT = 1, SETTINGS = 2, DOWNLOAD = 3, OPEN = 4, MOVE = 5, REMOVE = 6,
-            INFO = 7, OFFLINE = 8, DOWN = 9, ARROWS = 10;
+            INFO = 7, OFFLINE = 8, DOWN = 9, ARROWS = 10, PAUSE = 11, SORT = 12;
 
-    private final int type;
+    private int type;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
     private int directions = LEFT | UP | RIGHT | DOWN_DIR;
@@ -33,6 +33,11 @@ final class Icon extends Drawable {
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeJoin(Paint.Join.ROUND);
         paint.setColor(color);
+    }
+
+    void setType(int type) {
+        this.type = type;
+        invalidateSelf();
     }
 
     void setColor(int color) {
@@ -104,6 +109,15 @@ final class Icon extends Drawable {
             case OFFLINE:
                 path.addCircle(12, 12, 8.5f, Path.Direction.CW);
                 line(6, 6, 18, 18);
+                break;
+            case PAUSE:
+                line(9, 6.5f, 9, 17.5f);
+                line(15, 6.5f, 15, 17.5f);
+                break;
+            case SORT:
+                line(5, 7, 19, 7);
+                line(5, 12, 15, 12);
+                line(5, 17, 11, 17);
                 break;
             case DOWN:
                 chevron(6.5f, 9.5f, 12, 15, 17.5f, 9.5f);

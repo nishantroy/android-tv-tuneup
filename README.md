@@ -104,12 +104,15 @@ The settings changes are reversed in the TV's own Settings. Details are in the m
 | Where | Remote |
 | --- | --- |
 | Carousel | Left and Right slide through apps, OK opens the one in the middle, Up goes to Inputs and Settings |
+| Now Playing (Up from the carousel, then Left, when something is playing) | A card with the artwork, title and artist of what is playing in the background. OK pauses or resumes it. Optional: it needs one extra permission, see the manual guide |
 | Continue Watching (Down from the carousel) | OK resumes that show or episode in its app |
 | All apps (Down again) | A grid of everything on Home, ending in an "Add app" tile. Up from the top row, or Back, returns to the carousel |
 | Any app | Hold OK, or press Menu, for Open, Move, Remove from Home and App info |
 
-Newly installed apps are added to Home automatically. The backdrop takes its color from the
-focused app's artwork.
+The carousel starts on the app you opened last, followed by the rest in order of recency. The
+grid keeps the arrangement you gave it, and its last tile switches the carousel to that order
+instead. Newly installed apps are added to Home automatically. The backdrop takes its color
+from the focused app's artwork.
 
 For screenshots that don't show your own viewing history, start it in demo mode:
 
@@ -117,7 +120,7 @@ For screenshots that don't show your own viewing history, start it in demo mode:
 adb shell am start -n local.tvhome/.HomeActivity --ez demo true    # false to turn it off
 ```
 
-The launcher is about 2,500 lines of plain Java with no dependencies, built by
+The launcher is about 2,900 lines of plain Java with no dependencies, built by
 [`launcher/build.sh`](launcher/build.sh) without Gradle. It was tuned for a weak GPU: on the test
 TV, elevation shadows and full-screen gradients each cost tens of milliseconds a frame, so it
 uses neither.

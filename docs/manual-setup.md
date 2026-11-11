@@ -166,6 +166,20 @@ anything:
 scripts/debloat.sh $TV debloat/stock-home.txt
 ```
 
+### Turn on Now Playing (optional)
+
+The launcher can show what is playing in the background (music from Spotify, say) as a card in
+its header, with the artwork, title, artist, and play and pause. Android only tells an app what is playing if the app has
+an enabled notification listener, and only adb or the TV's settings can enable one:
+
+```sh
+adb -s $TV shell cmd notification allow_listener local.tvhome/local.tvhome.MediaListener
+```
+
+The launcher's listener is an empty class that reads no notifications, but the permission
+itself is a broad one; see [safety.md](safety.md). Leave this step out and the card simply
+never appears. To switch it off again, run the same command with `disallow_listener`.
+
 ### Go back
 
 ```sh

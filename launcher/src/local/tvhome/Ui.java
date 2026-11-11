@@ -34,6 +34,7 @@ final class Ui {
     // Content
     static final int TEXT = 0xF5FFFFFF, TEXT_SECONDARY = 0x99FFFFFF, TEXT_TERTIARY = 0x8CFFFFFF;
     static final int ON_LIGHT = 0xFF08090B;
+    static final int ON_LIGHT_SECONDARY = 0x9908090B;
     static final int ACCENT = 0xFF8AB8FF, WARN = 0xFFFFB86B;
     static final int NEUTRAL_GLOW = 0xFF6F86B8;
 

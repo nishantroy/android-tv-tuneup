@@ -31,7 +31,13 @@ sh() { adb -s "$tv" shell "$@" </dev/null | tr -d '\r'; }
 # The stock home needs its helpers back before it is switched on.
 scripts/debloat.sh "$tv" --restore --yes debloat/stock-home.txt
 sh pm enable $stock
-[[ $keep -eq 1 ]] || adb -s "$tv" uninstall $app
+if [[ $keep -ne 1 ]]; then
+  # If the launcher's ambient screen was chosen as the screensaver, hand that back to the TV's default.
+  if [[ "$(sh settings get secure screensaver_components)" == "$app/"* ]]; then
+    sh settings delete secure screensaver_components >/dev/null
+  fi
+  adb -s "$tv" uninstall $app
+fi
 sh input keyevent KEYCODE_HOME
 home="$(sh cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME | tail -1)"
 [[ "$home" == "$stock/"* ]] || { echo "Home is $home, not the stock home." >&2; exit 1; }

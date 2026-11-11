@@ -19,7 +19,8 @@ Everything is done over `adb`, the TV's own debugging connection. Every change c
 
 Parts of the "before" image are pixelated: the account picture and a notice, and the
 promotional stills the stock home screen was showing. The Continue Watching entries in the
-"after" images are the launcher's built-in samples, not anyone's viewing history.
+"after" images are the launcher's built-in samples, not anyone's viewing history, and the
+weather in them is made up.
 
 ## What it does
 
@@ -31,14 +32,15 @@ promotional stills the stock home screen was showing. The Continue Watching entr
    which made every power-on a full 35-second boot. With it on, the TV wakes in under two
    seconds.
 3. **Replaces the home screen** with the launcher in [`launcher/`](launcher): a carousel of your
-   apps, a Continue Watching row, and a grid of everything one press away. No recommendations,
-   no ads, no account.
+   apps, a Continue Watching row, and a grid of everything one press away, over a wallpaper
+   with frosted-glass panels. Left idle, it fades to an ambient screen with the time. No
+   recommendations, no ads, no account.
 
 More of the launcher:
 
-| Continue Watching | All apps | Options for an app |
-| --- | --- | --- |
-| ![Continue Watching row focused](docs/images/after-continue-watching.png) | ![Grid of all apps](docs/images/after-all-apps.png) | ![Options sheet](docs/images/after-options.png) |
+| Continue Watching | All apps | Options for an app | Ambient screen |
+| --- | --- | --- | --- |
+| ![Continue Watching row focused](docs/images/after-continue-watching.png) | ![Grid of all apps](docs/images/after-all-apps.png) | ![Options sheet](docs/images/after-options.png) | ![Ambient screen with the time over a wallpaper](docs/images/after-ambient.png) |
 
 ## Results on one TV
 
@@ -49,7 +51,7 @@ Measured on a TCL 55S434 (Android TV 9, 2 GB RAM). One TV, one set of measuremen
 | Power-on | about 35 s, a cold boot every time | about 1.4 s wake from sleep |
 | Home screen app memory | 93 MB | 42 MB |
 | Installed packages | 121 | 96 |
-| Launcher frame time while the carousel slides | n/a | 12 to 13 ms median |
+| Launcher frame time while the carousel slides | n/a | 14 to 16 ms median with a wallpaper, 12 to 13 with the plain backdrop |
 
 A cold boot, when one does happen, still takes about 35 seconds. That time is spent in the
 bootloader, the kernel and Android's own start-up, and nothing here changes it.
@@ -108,11 +110,43 @@ The settings changes are reversed in the TV's own Settings. Details are in the m
 | Continue Watching (Down from the carousel) | OK resumes that show or episode in its app |
 | All apps (Down again) | A grid of everything on Home, ending in an "Add app" tile. Up from the top row, or Back, returns to the carousel |
 | Any app | Hold OK, or press Menu, for Open, Move, Remove from Home and App info |
+| Ambient screen | Appears after a minute idle on Home. Any button returns; play, pause and volume work without leaving it |
 
 The carousel starts on the app you opened last, followed by the rest in order of recency. The
 grid keeps the arrangement you gave it, and its last tile switches the carousel to that order
-instead. Newly installed apps are added to Home automatically. The backdrop takes its color
-from the focused app's artwork.
+instead. Newly installed apps are added to Home automatically.
+
+### Wallpaper, glass and the plain backdrop
+
+The launcher shows a wallpaper behind everything, and draws its header controls and the
+Continue Watching shelf as frosted glass over it. Five pictures are built in and take turns.
+Another tile at the end of the grid switches to the plain dark backdrop, where instead the room
+takes its color from the focused app's artwork. The two are a choice because of the TV's
+graphics chip: it can afford a wallpaper or that moving light, not both.
+
+- **Your own pictures:** copy them to the TV and they join the rotation.
+  ```sh
+  adb push my-picture.jpg /sdcard/Android/data/local.tvhome/files/wallpapers/
+  ```
+- **Pictures for a time or weather:** extra words in a file name say when it suits, as in
+  `bridge.dawn.dusk.fog.jpg`. Times are `dawn`, `day`, `dusk` and `night`; weather is `fog`,
+  `rain` and `snow` (weather only counts once a place is set, below). A plain name is shown
+  any time.
+- **A San Francisco set** is in [`wallpapers/san-francisco/`](wallpapers/san-francisco), not
+  built in. Push the folder's pictures the same way if you want them.
+
+| | | |
+| --- | --- | --- |
+| ![Golden Gate Bridge in fog](wallpapers/san-francisco/golden-gate.dawn.dusk.fog.jpg) | ![Coit Tower at night](wallpapers/san-francisco/coit-tower.night.jpg) | ![Jets over the bay](wallpapers/san-francisco/fleet-week.day.jpg) |
+
+All of the pictures are drawn by the scripts in [`wallpapers/`](wallpapers).
+
+### Weather, and the ambient screen as the screensaver
+
+Both are optional and set over adb; the manual guide has the commands. Weather is off until
+you give it a place, because it means sending that place's coordinates to a weather service.
+The ambient screen can also replace the TV's screensaver, so it appears when the TV is left
+idle inside an app too.
 
 For screenshots that don't show your own viewing history, start it in demo mode:
 
@@ -120,10 +154,10 @@ For screenshots that don't show your own viewing history, start it in demo mode:
 adb shell am start -n local.tvhome/.HomeActivity --ez demo true    # false to turn it off
 ```
 
-The launcher is about 2,900 lines of plain Java with no dependencies, built by
+The launcher is about 4,000 lines of plain Java with no dependencies, built by
 [`launcher/build.sh`](launcher/build.sh) without Gradle. It was tuned for a weak GPU: on the test
 TV, elevation shadows and full-screen gradients each cost tens of milliseconds a frame, so it
-uses neither.
+uses neither, and the glass is a blurred copy of the wallpaper made once, not a live blur.
 
 ## What's in this repository
 
@@ -134,6 +168,7 @@ uses neither.
 | `scripts/debloat.sh` | Removes or restores the packages in a list, with a dry run |
 | `scripts/install-launcher.sh` | Installs the launcher and makes it Home |
 | `scripts/remove-launcher.sh` | Switches back to the stock home |
+| `wallpapers/` | The optional San Francisco pictures, and the scripts that draw every wallpaper |
 | `docs/` | The guides, the safety notes, and the screenshots |
 | `AGENTS.md`, `CLAUDE.md` | Rules for AI assistants: confirm with the human before any change |
 

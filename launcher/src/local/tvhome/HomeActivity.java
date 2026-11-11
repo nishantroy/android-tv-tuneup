@@ -46,6 +46,7 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -69,7 +70,15 @@ public class HomeActivity extends Activity implements Carousel.Host {
     /** The Now Playing card: as tall as the date and clock opposite it. */
     private static final float NOW_HEIGHT = 64, NOW_TEXT_WIDTH = 200;
     private static final String K_FAVS = "favs", K_KNOWN = "known", K_COACH = "coach", K_LAST = "last";
-    private static final String TAG_ADD = "+", TAG_STORE = "store", TAG_ORDER = "order";
+    private static final String TAG_ADD = "+", TAG_STORE = "store", TAG_ORDER = "order", TAG_WALL = "wall";
+    /** Wallpaper behind the launcher (default), or the plain dark backdrop. Read by AmbientDream too. */
+    static final String K_WALLPAPER = "wallpaper";
+    /** `--ez ambient true` shows the ambient screen at once, for screenshots. */
+    private static final String EXTRA_AMBIENT = "ambient";
+    private static final long AMBIENT_AFTER_MS = 60_000, ROTATE_HOME_MS = 10 * 60_000, ROTATE_AMBIENT_MS = 2 * 60_000,
+            WEATHER_MS = 30 * 60_000;
+    /** The glass shelf under Continue Watching: how far below the section's top it starts, and its height. */
+    private static final float SHELF_DROP = 19, SHELF_HEIGHT = 154;
     /** Carousel in most-recently-opened order (default), or the order of the grid. */
     private static final String K_RECENT_FIRST = "recentFirst", K_OPENED = "opened:";
     private static final String PLAY_STORE = "com.android.vending";
@@ -107,6 +116,15 @@ public class HomeActivity extends Activity implements Carousel.Host {
     private boolean demo;
 
     private GlowView glow;
+    private Backdrop backdrop;
+    private AmbientView ambient;
+    private boolean ambientOn, resumed;
+    private int swallowKey = -1;
+    private long lastKeyAt;
+    private View shelf;
+    private LinearLayout weatherChip;
+    private TextView weatherTemp;
+    private final Icon weatherIcon = new Icon(Icon.SUN, Ui.TEXT);
     private FrameLayout homeLayer, stage, pickerLayer, sheetLayer;
     private Carousel flow;
     private TextView nameLabel, hintPill, netText;
@@ -147,6 +165,16 @@ public class HomeActivity extends Activity implements Carousel.Host {
         getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Ui.BG));
 
         FrameLayout root = new FrameLayout(this);
+        backdrop = new Backdrop(this);
+        // The wallpaper covers the window, so the window's own fill would be painted for nothing.
+        backdrop.onChange(() -> {
+            getWindow().setBackgroundDrawable(backdrop.frost() != null ? null
+                    : new android.graphics.drawable.ColorDrawable(Ui.BG));
+            // The colored light and a wallpaper are each a full-screen layer, and this GPU can
+            // afford one of them: with both, the carousel ran at 26 ms a frame.
+            glow.setVisibility(backdrop.frost() != null ? View.INVISIBLE : View.VISIBLE);
+        });
+        root.addView(backdrop, match());
         glow = new GlowView(this);
         root.addView(glow, match());
         homeLayer = buildHome();
@@ -158,8 +186,14 @@ public class HomeActivity extends Activity implements Carousel.Host {
         sheetLayer.setBackgroundColor(Ui.SCRIM);
         sheetLayer.setVisibility(View.GONE);
         root.addView(sheetLayer, match());
+        ambient = new AmbientView(this, backdrop, true);
+        ambient.setAlpha(0f);
+        ambient.setVisibility(View.GONE);
+        root.addView(ambient, match());
         setContentView(root);
         demo = getIntent().getBooleanExtra(EXTRA_DEMO, false);
+        backdrop.setOn(getPreferences(MODE_PRIVATE).getBoolean(K_WALLPAPER, true));
+        applyExtras(getIntent());
 
         IntentFilter f = new IntentFilter();
         f.addAction(Intent.ACTION_PACKAGE_ADDED);
@@ -176,6 +210,13 @@ public class HomeActivity extends Activity implements Carousel.Host {
     @Override
     protected void onResume() {
         super.onResume();
+        resumed = true;
+        swallowKey = -1;
+        touch();
+        ui.removeCallbacks(rotate);
+        ui.postDelayed(rotate, ROTATE_HOME_MS);
+        ui.removeCallbacks(weatherTick);
+        weatherTick.run();
         nowPlaying.start(); // re-reads what is playing; also picks up a listener enabled since launch
         reload();
         if (!firstRender) {
@@ -185,10 +226,23 @@ public class HomeActivity extends Activity implements Carousel.Host {
     }
 
     @Override
+    protected void onPause() {
+        resumed = false;
+        ui.removeCallbacks(idle);
+        ui.removeCallbacks(rotate);
+        ui.removeCallbacks(weatherTick);
+        if (ambientOn) exitAmbient();
+        super.onPause();
+    }
+
+    @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        if (ambientOn) exitAmbient();
+        applyExtras(intent);
         if (intent.hasExtra(EXTRA_DEMO)) {
             demo = intent.getBooleanExtra(EXTRA_DEMO, false);
+            nowPlaying.start(); // shows or hides Now Playing to match
             continueSig = null;
             reload();
         }
@@ -224,6 +278,19 @@ public class HomeActivity extends Activity implements Carousel.Host {
     public boolean dispatchKeyEvent(KeyEvent e) {
         boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
         int key = e.getKeyCode();
+        if (ambientOn || key == swallowKey) {
+            // Playback and volume keys do their job without waking the screen.
+            if (isMediaKey(key)) return super.dispatchKeyEvent(e);
+            // Any other button brings the launcher back, and does nothing else.
+            if (ambientOn && down) {
+                swallowKey = key;
+                exitAmbient();
+            } else if (!down) {
+                swallowKey = -1;
+            }
+            return true;
+        }
+        touch();
         if (movingKey != null) {
             int step = 0;
             switch (key) {
@@ -316,6 +383,21 @@ public class HomeActivity extends Activity implements Carousel.Host {
         ampm.setLetterSpacing(0.06f);
         ampm.setPadding(Ui.dp(6), 0, 0, 0);
         timeRow.addView(ampm);
+        weatherChip = new LinearLayout(this);
+        weatherChip.setGravity(Gravity.CENTER_VERTICAL);
+        weatherChip.setPadding(Ui.dp(10), 0, Ui.dp(13), 0);
+        weatherChip.setBackground(new Glass(weatherChip, backdrop, 15));
+        ImageView weatherGlyph = new ImageView(this);
+        weatherGlyph.setImageDrawable(weatherIcon);
+        weatherChip.addView(weatherGlyph, new LinearLayout.LayoutParams(Ui.dp(17), Ui.dp(17)));
+        weatherTemp = Ui.text(this, "", 15, 500, Ui.TEXT);
+        weatherTemp.setPadding(Ui.dp(7), 0, 0, 0);
+        weatherChip.addView(weatherTemp);
+        weatherChip.setVisibility(View.GONE);
+        LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(30));
+        chipLp.leftMargin = Ui.dp(18);
+        chipLp.gravity = Gravity.CENTER_VERTICAL;
+        timeRow.addView(weatherChip, chipLp);
         LinearLayout.LayoutParams rowLp = wrapLinear();
         rowLp.topMargin = Ui.dp(6);
         rowLp.leftMargin = -Ui.dp(2); // optical alignment: large numerals carry side bearing
@@ -389,6 +471,15 @@ public class HomeActivity extends Activity implements Carousel.Host {
         FrameLayout.LayoutParams nameLp = wrap(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         nameLp.topMargin = Ui.dp(FLOW_TOP + FLOW_HEIGHT / 2 + Carousel.CARD_H / 2 + 16);
         s.addView(nameLabel, nameLp);
+
+        // A glass shelf for Continue Watching, running off the right edge with the row.
+        shelf = new View(this);
+        shelf.setBackground(new Glass(shelf, backdrop, 20));
+        shelf.setVisibility(View.GONE);
+        FrameLayout.LayoutParams shelfLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                Ui.dp(SHELF_HEIGHT), Gravity.TOP);
+        shelfLp.setMargins(Ui.dp(Ui.EDGE - 14), Ui.dp(CONTINUE_TOP + SHELF_DROP), -Ui.dp(40), 0);
+        s.addView(shelf, shelfLp);
 
         continueSection = new LinearLayout(this);
         continueSection.setOrientation(LinearLayout.VERTICAL);
@@ -567,8 +658,9 @@ public class HomeActivity extends Activity implements Carousel.Host {
         TextView t = Ui.text(this, label, 14, 500, Ui.TEXT);
         t.setPadding(Ui.dp(8), 0, 0, 0);
         p.addView(t);
+        Glass glass = new Glass(p, backdrop, 18);
         View.OnFocusChangeListener style = (v, focused) -> {
-            p.setBackground(focused ? Ui.shape(Color.WHITE, 18, 0, 0) : Ui.shape(Ui.GLASS, 18, 0.5f, Ui.HAIRLINE));
+            p.setBackground(focused ? Ui.shape(Color.WHITE, 18, 0, 0) : glass);
             t.setTextColor(focused ? Ui.ON_LIGHT : Ui.TEXT);
             icon.setColor(focused ? Ui.ON_LIGHT : Ui.TEXT);
             float s = focused ? 1.04f : 1f;
@@ -581,6 +673,131 @@ public class HomeActivity extends Activity implements Carousel.Host {
         lp.leftMargin = Ui.dp(10);
         p.setLayoutParams(lp);
         return p;
+    }
+
+    // ---------------------------------------------------------------- wallpaper, weather, ambient
+
+    private void applyExtras(Intent intent) {
+        if (intent.hasExtra(Weather.EXTRA)) {
+            Weather.configure(this, intent.getStringExtra(Weather.EXTRA));
+            if (resumed) {
+                ui.removeCallbacks(weatherTick);
+                weatherTick.run();
+            }
+        }
+        // `--es wallpaper next` moves on to the next picture; any other text shows the picture named like it.
+        String wallpaper = intent.getStringExtra("wallpaper");
+        if ("next".equals(wallpaper)) backdrop.next();
+        else if (wallpaper != null) backdrop.pick(wallpaper);
+        if (intent.getBooleanExtra(EXTRA_AMBIENT, false)) ui.postDelayed(this::enterAmbient, 800); // once resumed
+    }
+
+    /** The shelf is glass, so it only exists over a wallpaper. */
+    private void syncShelf() {
+        shelf.setVisibility(backdrop.on() && continueSection.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
+    }
+
+    private final Runnable weatherTick = new Runnable() {
+        @Override
+        public void run() {
+            Weather.refresh(HomeActivity.this, io, ui, HomeActivity.this::showWeather);
+            ui.postDelayed(this, WEATHER_MS);
+        }
+    };
+
+    private void showWeather(Weather.Now now) {
+        if (demo) {
+            // A made-up reading with no place, so demo screenshots do not say where the TV is.
+            now = new Weather.Now();
+            now.temp = 64;
+            now.high = 68;
+            now.low = 52;
+            now.code = 1;
+            now.day = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) >= 7 && Calendar.getInstance().get(Calendar.HOUR_OF_DAY) < 18;
+            now.place = "";
+        }
+        ambient.setWeather(now);
+        if (now == null) {
+            weatherChip.setVisibility(View.GONE);
+            return;
+        }
+        weatherIcon.setType(now.icon());
+        weatherTemp.setText(now.temp + "°");
+        weatherChip.setContentDescription(now.temp + " degrees, " + now.words());
+        weatherChip.setVisibility(View.VISIBLE);
+    }
+
+    /** The wallpaper moves on now and then: often on the ambient screen, rarely while in use. */
+    private final Runnable rotate = new Runnable() {
+        @Override
+        public void run() {
+            boolean busy = !ambientOn && System.currentTimeMillis() - lastKeyAt < 8000;
+            if (!busy) backdrop.next();
+            ui.postDelayed(this, busy ? 15_000 : ambientOn ? ROTATE_AMBIENT_MS : ROTATE_HOME_MS);
+        }
+    };
+
+    private final Runnable idle = new Runnable() {
+        @Override
+        public void run() {
+            if (resumed && hasWindowFocus() && movingKey == null && sheetLayer.getVisibility() != View.VISIBLE
+                    && pickerLayer.getVisibility() != View.VISIBLE) {
+                enterAmbient();
+            } else {
+                ui.postDelayed(this, AMBIENT_AFTER_MS);
+            }
+        }
+    };
+
+    /** A button was pressed, or the launcher came to the front: the idle clock starts again. */
+    private void touch() {
+        lastKeyAt = System.currentTimeMillis();
+        ui.removeCallbacks(idle);
+        if (resumed) ui.postDelayed(idle, AMBIENT_AFTER_MS);
+    }
+
+    private void enterAmbient() {
+        if (ambientOn || !resumed) return;
+        ambientOn = true;
+        ui.removeCallbacks(idle);
+        ambient.setVisibility(View.VISIBLE);
+        ambient.animate().cancel();
+        ambient.animate().alpha(1f).setDuration(700).setInterpolator(Ui.STANDARD).withEndAction(null).start();
+        homeLayer.animate().alpha(0f).setDuration(500).withLayer().start();
+        glow.animate().alpha(0f).setDuration(500).start();
+        ui.removeCallbacks(rotate);
+        ui.postDelayed(rotate, ROTATE_AMBIENT_MS);
+    }
+
+    private void exitAmbient() {
+        if (!ambientOn) return;
+        ambientOn = false;
+        ambient.animate().cancel();
+        ambient.animate().alpha(0f).setDuration(Ui.FAST).withEndAction(() -> ambient.setVisibility(View.GONE)).start();
+        homeLayer.animate().alpha(1f).setDuration(Ui.BASE).withLayer().start();
+        glow.animate().alpha(1f).setDuration(Ui.BASE).start();
+        ui.removeCallbacks(rotate);
+        ui.postDelayed(rotate, ROTATE_HOME_MS);
+        touch();
+    }
+
+    private static boolean isMediaKey(int key) {
+        switch (key) {
+            case KeyEvent.KEYCODE_MEDIA_PLAY:
+            case KeyEvent.KEYCODE_MEDIA_PAUSE:
+            case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+            case KeyEvent.KEYCODE_MEDIA_NEXT:
+            case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+            case KeyEvent.KEYCODE_MEDIA_STOP:
+            case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
+            case KeyEvent.KEYCODE_MEDIA_REWIND:
+            case KeyEvent.KEYCODE_VOLUME_UP:
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+            case KeyEvent.KEYCODE_VOLUME_MUTE:
+                return true;
+            default:
+                return false;
+        }
     }
 
     // ---------------------------------------------------------------- now playing
@@ -627,8 +844,9 @@ public class HomeActivity extends Activity implements Carousel.Host {
         button.setPadding(Ui.dp(9), Ui.dp(9), Ui.dp(9), Ui.dp(9));
         nowCard.addView(button, new LinearLayout.LayoutParams(Ui.dp(34), Ui.dp(34)));
 
+        Glass glass = new Glass(nowCard, backdrop, 16);
         View.OnFocusChangeListener style = (v, focused) -> {
-            nowCard.setBackground(focused ? Ui.shape(Color.WHITE, 16, 0, 0) : Ui.shape(Ui.GLASS, 16, 0.5f, Ui.HAIRLINE));
+            nowCard.setBackground(focused ? Ui.shape(Color.WHITE, 16, 0, 0) : glass);
             nowTitle.setTextColor(focused ? Ui.ON_LIGHT : Ui.TEXT);
             nowDetail.setTextColor(focused ? Ui.ON_LIGHT_SECONDARY : Ui.TEXT_SECONDARY);
             nowGlyph.setColor(focused ? Ui.ON_LIGHT : Ui.TEXT);
@@ -662,7 +880,9 @@ public class HomeActivity extends Activity implements Carousel.Host {
     }
 
     private void showNowPlaying(MediaController controller) {
+        if (demo) controller = null; // demo screenshots show nothing of the owner's listening
         playing = controller;
+        ambient.setNowPlaying(controller, controller != null ? appForPackage(controller.getPackageName()) : null);
         MediaMetadata m = controller != null ? controller.getMetadata() : null;
         String title = m != null ? NowPlaying.title(m) : null;
         if (title == null) {
@@ -1239,7 +1459,8 @@ public class HomeActivity extends Activity implements Carousel.Host {
                     prefs.getLong(K_OPENED + y.key, 0), prefs.getLong(K_OPENED + x.key, 0)));
         }
 
-        StringBuilder sig = new StringBuilder(String.valueOf(movingKey)).append(recentFirst);
+        boolean wallpaper = prefs.getBoolean(K_WALLPAPER, true);
+        StringBuilder sig = new StringBuilder(String.valueOf(movingKey)).append(recentFirst).append(wallpaper);
         for (String k : shown) sig.append('|').append(k);
         sig.append("||");
         for (App a : strip) sig.append('|').append(a.key);
@@ -1286,6 +1507,15 @@ public class HomeActivity extends Activity implements Carousel.Host {
             focusTag(favGrid, TAG_ORDER);
         });
         favGrid.addView(sort);
+        Cell paper = new Cell(null, TAG_WALL, Icon.IMAGE, wallpaper ? "Backdrop: wallpaper" : "Backdrop: plain", true);
+        paper.setOnClickListener(v -> {
+            prefs.edit().putBoolean(K_WALLPAPER, !wallpaper).apply();
+            backdrop.setOn(!wallpaper);
+            syncShelf();
+            render(true);
+            focusTag(favGrid, TAG_WALL);
+        });
+        favGrid.addView(paper);
 
         pickGrid.removeAllViews();
         Cell store = new Cell(null, TAG_STORE, Icon.DOWNLOAD, "Get more apps", true);
@@ -1341,6 +1571,7 @@ public class HomeActivity extends Activity implements Carousel.Host {
         continueRow.removeAllViews();
         for (WatchNext.Item it : items) continueRow.addView(new ContinueCard(it));
         continueSection.setVisibility(items.isEmpty() ? View.GONE : View.VISIBLE);
+        syncShelf();
         gridCue.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
         continueRow.post(this::labelWholeCards);
         if (hadFocus) {

@@ -6,12 +6,14 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 
 /** A small family of line icons drawn on a 24-unit grid with one stroke weight. */
 final class Icon extends Drawable {
     static final int PLUS = 0, INPUT = 1, SETTINGS = 2, DOWNLOAD = 3, OPEN = 4, MOVE = 5, REMOVE = 6,
-            INFO = 7, OFFLINE = 8, DOWN = 9, ARROWS = 10, PAUSE = 11, SORT = 12;
+            INFO = 7, OFFLINE = 8, DOWN = 9, ARROWS = 10, PAUSE = 11, SORT = 12,
+            SUN = 13, MOON = 14, CLOUD = 15, RAIN = 16, SNOW = 17, STORM = 18, FOG = 19, IMAGE = 20;
 
     private int type;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -122,6 +124,60 @@ final class Icon extends Drawable {
             case DOWN:
                 chevron(6.5f, 9.5f, 12, 15, 17.5f, 9.5f);
                 break;
+            case SUN:
+                path.addCircle(12, 12, 4, Path.Direction.CW);
+                for (int i = 0; i < 8; i++) {
+                    double a = i * Math.PI / 4;
+                    float cos = (float) Math.cos(a), sin = (float) Math.sin(a);
+                    line(12 + 6.8f * cos, 12 + 6.8f * sin, 12 + 9 * cos, 12 + 9 * sin);
+                }
+                break;
+            case MOON:
+                path.moveTo(13.2f, 4.6f);
+                path.cubicTo(7.5f, 4.2f, 3.6f, 9.2f, 4.8f, 14.2f);
+                path.cubicTo(6, 19.2f, 12, 21.2f, 16.2f, 18.6f);
+                path.cubicTo(17.8f, 17.6f, 18.9f, 16, 19.4f, 14.2f);
+                path.cubicTo(15.2f, 15.6f, 10.6f, 13.4f, 10.4f, 9.4f);
+                path.cubicTo(10.3f, 7.4f, 11.4f, 5.6f, 13.2f, 4.6f);
+                path.close();
+                break;
+            case CLOUD:
+                cloud(0);
+                break;
+            case RAIN:
+                cloud(-3);
+                line(8.5f, 18, 7.5f, 20.5f);
+                line(12.5f, 18, 11.5f, 20.5f);
+                line(16.5f, 18, 15.5f, 20.5f);
+                break;
+            case SNOW:
+                cloud(-3);
+                line(8, 19.4f, 8, 19.5f);
+                line(12, 20.6f, 12, 20.7f);
+                line(16, 19.4f, 16, 19.5f);
+                break;
+            case STORM:
+                cloud(-3);
+                path.moveTo(12.8f, 16.4f);
+                path.lineTo(10.6f, 19.2f);
+                path.lineTo(13.2f, 19.2f);
+                path.lineTo(11.4f, 22);
+                break;
+            case FOG:
+                line(5, 8, 17, 8);
+                line(7, 12, 19, 12);
+                line(5, 16, 15, 16);
+                break;
+            case IMAGE:
+                // A picture frame with a hill and a sun.
+                path.addRoundRect(new RectF(3.5f, 5, 20.5f, 19), 2.5f, 2.5f, Path.Direction.CW);
+                path.moveTo(3.8f, 16.2f);
+                path.lineTo(9, 11.4f);
+                path.lineTo(13, 15);
+                path.lineTo(15.6f, 12.8f);
+                path.lineTo(20.2f, 16.6f);
+                path.addCircle(15.6f, 9, 1.3f, Path.Direction.CW);
+                break;
             default:
                 break;
         }
@@ -153,6 +209,19 @@ final class Icon extends Drawable {
         }
         c.drawPath(path, paint);
         paint.setStrokeWidth(saved);
+    }
+
+    /** A flat-bottomed cloud, moved down by dy. */
+    private void cloud(float dy) {
+        path.moveTo(7.5f, 18 + dy);
+        path.lineTo(17, 18 + dy);
+        path.cubicTo(19.8f, 18 + dy, 21, 16.2f + dy, 21, 14.5f + dy);
+        path.cubicTo(21, 12.6f + dy, 19.6f, 11.2f + dy, 17.8f, 11.1f + dy);
+        path.cubicTo(17.3f, 8.6f + dy, 15.2f, 6.8f + dy, 12.6f, 6.8f + dy);
+        path.cubicTo(9.9f, 6.8f + dy, 7.7f, 8.7f + dy, 7.3f, 11.3f + dy);
+        path.cubicTo(5.2f, 11.5f + dy, 3.6f, 13 + dy, 3.6f, 14.8f + dy);
+        path.cubicTo(3.6f, 16.6f + dy, 5.2f, 18 + dy, 7.5f, 18 + dy);
+        path.close();
     }
 
     private void line(float x1, float y1, float x2, float y2) {

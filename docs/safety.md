@@ -28,6 +28,8 @@ installing an app.
 | Stock home screen disabled | `scripts/remove-launcher.sh <tv>`, or on the TV: Settings → Apps → See All Apps → Disabled Apps → Android TV Home → Enable |
 | Launcher installed and set as Home | `scripts/remove-launcher.sh <tv>` |
 | Quick Start, animation scales, wifi | The TV's own Settings |
+| Screensaver set to the launcher's ambient screen (optional) | `adb shell settings put secure screensaver_components <what it was>`; `scripts/remove-launcher.sh` resets it to the TV's default |
+| Pictures copied to the launcher's wallpaper folder (optional) | `adb shell rm -r /sdcard/Android/data/local.tvhome/files/wallpapers`, or uninstalling the launcher |
 | Now Playing listener enabled (optional) | `adb shell cmd notification disallow_listener local.tvhome/local.tvhome.MediaListener`, or uninstalling the launcher |
 
 The remove-and-restore path and the switch to the launcher and back were each run on the test
@@ -62,6 +64,12 @@ TV and worked. A factory reset returns the TV to how it shipped regardless.
   uses the access only to read the title, artist and artwork of the current media session
   and to send it play and pause. Artwork given as a web address is downloaded from that
   address.
+- Weather is off unless you set a place. Once set, the launcher sends that place's latitude and
+  longitude, rounded to two decimal places (about a kilometre), to api.open-meteo.com about
+  every half hour while it or its screensaver is on screen. That service sees those
+  coordinates and your network address. The place itself is stored only on the TV.
+- Wallpapers are files on the TV: the built-in ones, and any you copy there. Nothing is
+  downloaded for them.
 - It has no analytics, no account, no ads, and contacts no server belonging to this project.
 
 ## Legal notes
@@ -78,6 +86,10 @@ Not legal advice, and the position can differ by country.
   showing are pixelated.
 - The carousel is a generic tilted-card layout. It does not use any other product's name,
   artwork or code.
+- The wallpapers are original drawings made by the scripts in `wallpapers/`, under the same
+  MIT License. The San Francisco set depicts public landmarks in a simplified style.
+- Weather data comes from Open-Meteo, whose free service is for non-commercial use; see its
+  terms if you plan anything beyond a TV at home.
 
 ## What was verified, and what was not
 
@@ -89,7 +101,14 @@ Verified on the test TV:
   Continue Watching entry, adding, moving and removing apps.
 - One sleep and wake cycle with Quick Start on: about 1.4 seconds to wake, network back
   within about five seconds.
-- Frame times while the carousel slides: a 12 to 13 ms median, measured with `dumpsys gfxinfo`.
+- Frame times while the carousel slides, measured with `dumpsys gfxinfo`: a 12 to 13 ms median
+  with the plain backdrop; 14 to 15 ms with a wallpaper, and 16 ms with a wallpaper while music
+  was playing. With a wallpaper about one frame in ten takes longer than the 16.7 ms a 60 Hz
+  screen allows.
+- The wallpaper and glass panels on Home, the ambient screen (entered directly and left with
+  one key press), the ambient screen as the system screensaver including one change of
+  picture, weather for one place in clear conditions, and each bundled and San Francisco
+  picture behind the launcher.
 - The carousel reordering after an app is opened, with the grid keeping its order.
 - Now Playing with one app, Spotify: the card appeared with artwork, title and artist, and
   OK paused and resumed playback.
@@ -103,6 +122,10 @@ Not verified:
 - Now Playing with any app other than Spotify.
 - The grid tile that switches the carousel between recent-first and grid order (it appears;
   pressing it was not exercised).
+- The ambient screen arriving by itself after a minute idle (it was only entered directly).
+- The grid tile that switches between wallpaper and the plain backdrop.
+- Pictures being chosen for dawn, dusk, night or fog: only the daytime choice was seen.
+- Weather over more than an hour, in conditions other than clear, or in Celsius.
 - Voice search and Google Assistant after the removals.
 - Casting to the TV after the removals.
 - Switching to an HDMI input from the Inputs menu (the menu opens; no input was selected).

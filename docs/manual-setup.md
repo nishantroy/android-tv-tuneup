@@ -180,6 +180,52 @@ The launcher's listener is an empty class that reads no notifications, but the p
 itself is a broad one; see [safety.md](safety.md). Leave this step out and the card simply
 never appears. To switch it off again, run the same command with `disallow_listener`.
 
+### Weather (optional)
+
+The launcher can show the temperature beside its clock, and the day's weather on the ambient
+screen. It asks [Open-Meteo](https://open-meteo.com), a free service that needs no account,
+and to do that it sends the coordinates you give it, rounded to two decimal places, about
+every half hour while the launcher or its screensaver is showing. Give it a latitude, a
+longitude and a name to display:
+
+```sh
+adb -s $TV shell "am start -n local.tvhome/.HomeActivity --es weather '40.71,-74.01,New York'"
+```
+
+Add `,C` or `,F` after the name to choose the unit; otherwise it follows the TV's region. The
+place is stored only on the TV. To turn weather off again:
+
+```sh
+adb -s $TV shell am start -n local.tvhome/.HomeActivity --es weather off
+```
+
+### The ambient screen as the screensaver (optional)
+
+After a minute idle on Home the launcher fades to its ambient screen by itself. To have the
+same screen as the TV's screensaver, so it also appears when the TV is left idle in an app,
+first note what the screensaver is now, then switch it:
+
+```sh
+adb -s $TV shell settings get secure screensaver_components
+adb -s $TV shell settings put secure screensaver_components local.tvhome/local.tvhome.AmbientDream
+```
+
+To go back, `settings put` the value the first command printed. `scripts/remove-launcher.sh`
+hands the screensaver back to the TV's default when it uninstalls the launcher.
+
+### Wallpapers (optional)
+
+Copy your own pictures, or the San Francisco set in this repository, to the launcher's folder
+on the TV. They join the built-in ones the next time the launcher starts.
+
+```sh
+adb -s $TV push wallpapers/san-francisco/*.jpg /sdcard/Android/data/local.tvhome/files/wallpapers/
+adb -s $TV shell am force-stop local.tvhome    # then press Home
+```
+
+The README explains how a file name can tie a picture to a time of day or to the weather. To
+remove them, delete that folder: `adb -s $TV shell rm -r /sdcard/Android/data/local.tvhome/files/wallpapers`.
+
 ### Go back
 
 ```sh

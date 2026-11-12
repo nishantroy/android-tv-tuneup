@@ -112,8 +112,7 @@ Verified on the test TV:
   the built-in ones.
 - Day pictures being chosen by day, and night pictures after dark.
 - The weather drawn on the ambient screen, each effect forced on in turn: rain, drizzle,
-  snow, fog and shooting stars, seen over a night picture and recorded. Fog at night was
-  dimmed afterwards, and that dimmer version has not been seen on the TV.
+  snow, fog and shooting stars, seen over a night picture and recorded.
 - The carousel reordering after an app is opened, with the grid keeping its order.
 - The two grid tiles: switching the carousel between recent-first and grid order, and
   switching between wallpaper and the plain backdrop, each pressed and pressed back.

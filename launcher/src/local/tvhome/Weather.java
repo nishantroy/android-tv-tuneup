@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -35,6 +36,8 @@ final class Weather {
     static final class Now {
         int temp, high, low, code;
         boolean day;
+        /** Today's sunrise and sunset there, in minutes after midnight, or -1 if not known. */
+        int sunrise = -1, sunset = -1;
         String place;
 
         /** A word or two for the conditions, from the WMO weather code. */
@@ -93,6 +96,8 @@ final class Weather {
         n.low = p.getInt("low", 0);
         n.code = p.getInt("code", 0);
         n.day = p.getBoolean("day", true);
+        n.sunrise = p.getInt("sunrise", -1);
+        n.sunset = p.getInt("sunset", -1);
         n.place = p.getString("place", "");
         return n;
     }
@@ -105,14 +110,15 @@ final class Weather {
             done.accept(null);
             return;
         }
-        if (System.currentTimeMillis() - p.getLong("at", 0) < FRESH_MS) {
+        // A reading saved before sunrise and sunset were kept is fetched again to get them.
+        if (System.currentTimeMillis() - p.getLong("at", 0) < FRESH_MS && p.contains("sunrise")) {
             done.accept(cached(c));
             return;
         }
         io.execute(() -> {
             try {
                 String url = String.format(Locale.US, "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f"
-                        + "&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min"
+                        + "&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset"
                         + "&temperature_unit=%s&timezone=auto&forecast_days=1",
                         p.getFloat("lat", 0), p.getFloat("lon", 0),
                         p.getBoolean("fahrenheit", false) ? "fahrenheit" : "celsius");
@@ -123,12 +129,25 @@ final class Weather {
                         .putBoolean("day", current.getInt("is_day") == 1)
                         .putInt("high", (int) Math.round(daily.getJSONArray("temperature_2m_max").getDouble(0)))
                         .putInt("low", (int) Math.round(daily.getJSONArray("temperature_2m_min").getDouble(0)))
+                        .putInt("sunrise", minutes(daily.optJSONArray("sunrise")))
+                        .putInt("sunset", minutes(daily.optJSONArray("sunset")))
                         .putLong("at", System.currentTimeMillis()).commit();
             } catch (Exception ignored) {
                 // Offline or a bad answer: fall back to the last reading while it is usable.
             }
             ui.post(() -> done.accept(cached(c)));
         });
+    }
+
+    /** "2026-01-31T06:38", the first entry of a daily list, as minutes after midnight; -1 if it is not that. */
+    private static int minutes(JSONArray days) {
+        String s = days != null ? days.optString(0, "") : "";
+        int t = s.indexOf('T');
+        try {
+            return t < 0 ? -1 : Integer.parseInt(s.substring(t + 1, t + 3)) * 60 + Integer.parseInt(s.substring(t + 4, t + 6));
+        } catch (RuntimeException e) {
+            return -1;
+        }
     }
 
     private static String get(String url) throws Exception {

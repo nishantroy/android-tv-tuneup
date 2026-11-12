@@ -131,7 +131,9 @@ graphics chip: it can afford a wallpaper or that moving light, not both.
 - **Pictures for a time or weather:** extra words in a file name say when it suits, as in
   `bridge.dawn.dusk.fog.jpg`. Times are `dawn`, `day`, `dusk` and `night`; weather is `fog`,
   `rain` and `snow` (weather only counts once a place is set, below). A plain name is shown
-  any time.
+  any time. With a place set, `dawn` and `dusk` follow that place's sunrise and sunset, from
+  75 minutes on the daylight side to 45 minutes on the dark side. Without one they go by the
+  clock: dawn from 5 to 8, day until 4, dusk until 8.
 - **A San Francisco set** of fourteen pictures is in
   [`wallpapers/san-francisco/`](wallpapers/san-francisco), not built in. Push the folder's
   pictures the same way if you want them.
@@ -140,6 +142,8 @@ graphics chip: it can afford a wallpaper or that moving light, not both.
 | --- | --- | --- |
 | ![Golden Gate Bridge in fog](wallpapers/san-francisco/golden-gate.dawn.dusk.fog.jpg) | ![Coit Tower at night](wallpapers/san-francisco/coit-tower.night.jpg) | ![Jets over the bay](wallpapers/san-francisco/fleet-week.day.jpg) |
 | ![Sutro Tower above the fog](wallpapers/san-francisco/sutro-tower.dawn.day.fog.jpg) | ![The Bay Bridge lights at night](wallpapers/san-francisco/bay-bridge.night.jpg) | ![A windmill above a meadow of poppies](wallpapers/san-francisco/windmill.dawn.day.jpg) |
+
+![The home screen over the Lands End picture](docs/images/after-home-san-francisco.png)
 
 All of the pictures are drawn by the scripts in [`wallpapers/`](wallpapers).
 

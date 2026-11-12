@@ -115,9 +115,8 @@ final class Backdrop extends View {
     /** The pictures whose names say they suit now, or all of them if none does. */
     private List<String> suitable() {
         Weather.Now weather = Weather.cached(getContext());
-        int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        String time = weather != null && !weather.day ? "night"
-                : hour >= 5 && hour < 8 ? "dawn" : hour >= 8 && hour < 16 ? "day" : hour >= 16 && hour < 20 ? "dusk" : "night";
+        Calendar clock = Calendar.getInstance();
+        String time = timeOfDay(clock.get(Calendar.HOUR_OF_DAY) * 60 + clock.get(Calendar.MINUTE), weather);
         String sky = weather == null ? null : weather.icon() == Icon.FOG ? "fog" : weather.icon() == Icon.RAIN ? "rain"
                 : weather.icon() == Icon.SNOW ? "snow" : null;
         // Pictures the owner added replace the built-in ones; those are only the fallback.
@@ -135,6 +134,25 @@ final class Backdrop extends View {
             if (!timed || words.contains(time)) timely.add(source);
         }
         return !forSky.isEmpty() ? forSky : !timely.isEmpty() ? timely : pool;
+    }
+
+    /**
+     * dawn, day, dusk or night, for a time in minutes after midnight.
+     *
+     * With the weather on, dawn and dusk follow the sun where the weather is for: each runs
+     * from 75 minutes on the daylight side of sunrise or sunset to 45 minutes on the dark side,
+     * the stretch when the sky has colour. That assumes the TV's clock is in that place's time
+     * zone. Without the sun's times it goes by the clock alone.
+     */
+    static String timeOfDay(int minute, Weather.Now weather) {
+        if (weather != null && weather.sunrise >= 0 && weather.sunset > weather.sunrise) {
+            if (minute >= weather.sunrise - 45 && minute < weather.sunrise + 75) return "dawn";
+            if (minute >= weather.sunset - 75 && minute < weather.sunset + 45) return "dusk";
+            return minute > weather.sunrise && minute < weather.sunset ? "day" : "night";
+        }
+        if (weather != null && !weather.day) return "night";
+        int hour = minute / 60;
+        return hour >= 5 && hour < 8 ? "dawn" : hour >= 8 && hour < 16 ? "day" : hour >= 16 && hour < 20 ? "dusk" : "night";
     }
 
     private static boolean isPicture(String name) {

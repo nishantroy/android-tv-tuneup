@@ -400,7 +400,9 @@ public class HomeActivity extends Activity implements Carousel.Host {
         timeRow.addView(weatherChip, chipLp);
         LinearLayout.LayoutParams rowLp = wrapLinear();
         rowLp.topMargin = Ui.dp(6);
-        rowLp.leftMargin = -Ui.dp(2); // optical alignment: large numerals carry side bearing
+        // Optical alignment: large numerals carry side bearing. No more than their ink starts
+        // inside their box (about 1dp here), or the header cuts the edge off a round digit.
+        rowLp.leftMargin = -Ui.dp(1);
         header.addView(timeRow, rowLp);
         FrameLayout.LayoutParams headerLp = wrap(Gravity.TOP | Gravity.START);
         headerLp.setMargins(Ui.dp(Ui.EDGE), Ui.dp(HEADER_TOP), 0, 0);

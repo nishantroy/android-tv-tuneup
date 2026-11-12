@@ -32,11 +32,13 @@ final class AmbientView extends FrameLayout {
 
         LinearLayout left = new LinearLayout(c);
         left.setOrientation(LinearLayout.VERTICAL);
-        // The big numerals are pulled left of the column for optical alignment (below). The
-        // column carries that much padding so they stay inside it; drawn outside, a round
-        // digit such as 6 has its edge cut off.
-        int pull = Ui.dp(6);
+        // The big numerals are pulled left so their ink, not their box, lines up with the date
+        // above: at this size a digit starts about 2dp inside its box. The column carries the
+        // pull as padding and does not clip to it, so the digits are never drawn outside
+        // anything that would cut their edge off.
+        int pull = Ui.dp(2);
         left.setPadding(pull, 0, 0, 0);
+        left.setClipToPadding(false);
         TextClock date = clock(c, "EEEE, MMMM d", "EEEE, MMMM d", 13, 600, Ui.TEXT);
         date.setAllCaps(true);
         date.setLetterSpacing(0.18f);
@@ -54,7 +56,7 @@ final class AmbientView extends FrameLayout {
         timeRow.addView(ampm);
         LinearLayout.LayoutParams timeLp = wrap();
         timeLp.topMargin = Ui.dp(4);
-        timeLp.leftMargin = -pull; // optical alignment: large numerals carry side bearing
+        timeLp.leftMargin = -pull;
         left.addView(timeRow, timeLp);
 
         weatherRow = new LinearLayout(c);

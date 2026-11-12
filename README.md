@@ -15,12 +15,13 @@ Everything is done over `adb`, the TV's own debugging connection. Every change c
 
 | Before | After |
 | --- | --- |
-| ![The stock Android TV home screen](docs/images/before-home.png) | ![The replacement home screen](docs/images/after-home.png) |
+| ![The stock Android TV home screen](docs/images/before-home.png) | ![The replacement home screen, over a wallpaper of Lands End at dusk](docs/images/after-home-san-francisco.png) |
 
 Parts of the "before" image are pixelated: the account picture and a notice, and the
 promotional stills the stock home screen was showing. The Continue Watching entries in the
 "after" images are the launcher's built-in samples, not anyone's viewing history, and the
-weather in them is made up.
+weather in them is made up. The wallpaper in the "after" image is from the optional San
+Francisco set described below; a fresh install shows its own built-in pictures.
 
 ## What it does
 
@@ -119,7 +120,11 @@ instead. Newly installed apps are added to Home automatically.
 ### Wallpaper, glass and the plain backdrop
 
 The launcher shows a wallpaper behind everything, and draws its header controls and the
-Continue Watching shelf as frosted glass over it. Five pictures are built in and take turns.
+Continue Watching shelf as frosted glass over it. Five pictures are built in and take turns;
+this is one of them.
+
+![The home screen over a built-in picture of the northern lights](docs/images/after-home.png)
+
 Another tile at the end of the grid switches to the plain dark backdrop, where instead the room
 takes its color from the focused app's artwork. The two are a choice because of the TV's
 graphics chip: it can afford a wallpaper or that moving light, not both.
@@ -142,8 +147,6 @@ graphics chip: it can afford a wallpaper or that moving light, not both.
 | --- | --- | --- |
 | ![Golden Gate Bridge in fog](wallpapers/san-francisco/golden-gate.dawn.dusk.fog.jpg) | ![Coit Tower at night](wallpapers/san-francisco/coit-tower.night.jpg) | ![Jets over the bay](wallpapers/san-francisco/fleet-week.day.jpg) |
 | ![Sutro Tower above the fog](wallpapers/san-francisco/sutro-tower.dawn.day.fog.jpg) | ![The Bay Bridge lights at night](wallpapers/san-francisco/bay-bridge.night.jpg) | ![A windmill above a meadow of poppies](wallpapers/san-francisco/windmill.dawn.day.jpg) |
-
-![The home screen over the Lands End picture](docs/images/after-home-san-francisco.png)
 
 All of the pictures are drawn by the scripts in [`wallpapers/`](wallpapers).
 

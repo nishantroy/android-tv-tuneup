@@ -199,6 +199,18 @@ place is stored only on the TV. To turn weather off again:
 adb -s $TV shell am start -n local.tvhome/.HomeActivity --es weather off
 ```
 
+With weather on, the ambient screen also draws it over the picture: rain, drizzle, snow or
+drifting fog, and on clear nights the odd shooting star. A thunderstorm is shown as heavy
+rain. Visibility under 3 km counts as fog, since coastal fog is often reported only as cloud,
+and a picture already tagged for that weather gets no overlay. To see an effect without
+waiting for it, or to turn them off:
+
+```sh
+adb -s $TV shell am start -n local.tvhome/.HomeActivity --es effect rain   # drizzle, snow, fog, stars
+adb -s $TV shell am start -n local.tvhome/.HomeActivity --es effect off
+adb -s $TV shell am start -n local.tvhome/.HomeActivity --es effect auto   # follow the weather (default)
+```
+
 ### The ambient screen as the screensaver (optional)
 
 After a minute idle on Home the launcher fades to its ambient screen by itself. To have the

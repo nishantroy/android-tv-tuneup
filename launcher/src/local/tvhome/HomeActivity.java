@@ -687,6 +687,10 @@ public class HomeActivity extends Activity implements Carousel.Host {
                 weatherTick.run();
             }
         }
+        if (intent.hasExtra(SkyView.EXTRA)) {
+            SkyView.configure(this, intent.getStringExtra(SkyView.EXTRA));
+            ambient.skyChanged();
+        }
         // `--es wallpaper next` moves on to the next picture; any other text shows the picture named like it.
         String wallpaper = intent.getStringExtra("wallpaper");
         if ("next".equals(wallpaper)) backdrop.next();

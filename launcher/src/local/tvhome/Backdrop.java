@@ -117,8 +117,8 @@ final class Backdrop extends View {
         Weather.Now weather = Weather.cached(getContext());
         Calendar clock = Calendar.getInstance();
         String time = timeOfDay(clock.get(Calendar.HOUR_OF_DAY) * 60 + clock.get(Calendar.MINUTE), weather);
-        String sky = weather == null ? null : weather.icon() == Icon.FOG ? "fog" : weather.icon() == Icon.RAIN ? "rain"
-                : weather.icon() == Icon.SNOW ? "snow" : null;
+        String sky = weather == null ? null : weather.icon() == Icon.RAIN ? "rain" : weather.icon() == Icon.SNOW ? "snow"
+                : weather.foggy() ? "fog" : null;
         // Pictures the owner added replace the built-in ones; those are only the fallback.
         List<String> pool = new ArrayList<>();
         for (String source : sources) if (!source.startsWith("asset:")) pool.add(source);
@@ -153,6 +153,14 @@ final class Backdrop extends View {
         if (weather != null && !weather.day) return "night";
         int hour = minute / 60;
         return hour >= 5 && hour < 8 ? "dawn" : hour >= 8 && hour < 16 ? "day" : hour >= 16 && hour < 20 ? "dusk" : "night";
+    }
+
+    /** Whether the picture showing, or on its way, is tagged with this word, as "fog" in "sutro.day.fog.jpg". */
+    boolean showingTagged(String word) {
+        if (showing == null) return false;
+        String[] words = showing.substring(showing.lastIndexOf('/') + 1).toLowerCase().split("\\.");
+        for (int i = 1; i < words.length - 1; i++) if (words[i].equals(word)) return true;
+        return false;
     }
 
     private static boolean isPicture(String name) {

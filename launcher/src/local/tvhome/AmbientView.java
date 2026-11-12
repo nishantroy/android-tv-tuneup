@@ -25,10 +25,15 @@ final class AmbientView extends FrameLayout {
     private final Icon weatherIcon = new Icon(Icon.SUN, Ui.TEXT);
     private final TextView weatherText, title, detail;
     private final ImageView art;
+    private final SkyView sky;
     private String shownKey;
 
     AmbientView(Context c, Backdrop backdrop, boolean hint) {
         super(c);
+
+        // Weather over the picture, behind everything else.
+        sky = new SkyView(c, backdrop);
+        addView(sky, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         LinearLayout left = new LinearLayout(c);
         left.setOrientation(LinearLayout.VERTICAL);
@@ -124,7 +129,13 @@ final class AmbientView extends FrameLayout {
         }
     }
 
+    /** The effect setting changed. */
+    void skyChanged() {
+        sky.update();
+    }
+
     void setWeather(Weather.Now now) {
+        sky.setWeather(now);
         if (now == null) {
             weatherRow.setVisibility(GONE);
             return;

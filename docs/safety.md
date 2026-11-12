@@ -111,6 +111,9 @@ Verified on the test TV:
   Francisco picture behind the launcher, and pictures copied to the TV taking the place of
   the built-in ones.
 - Day pictures being chosen by day, and night pictures after dark.
+- The weather drawn on the ambient screen, each effect forced on in turn: rain, drizzle,
+  snow, fog and shooting stars, seen over a night picture and recorded. Fog at night was
+  dimmed afterwards, and that dimmer version has not been seen on the TV.
 - The carousel reordering after an app is opened, with the grid keeping its order.
 - The two grid tiles: switching the carousel between recent-first and grid order, and
   switching between wallpaper and the plain backdrop, each pressed and pressed back.
@@ -130,6 +133,8 @@ Not verified:
   rule that ties dawn and dusk to sunrise and sunset was run through a whole day on a
   computer, not watched on the TV.
 - Weather over more than an hour, in conditions other than clear, or in Celsius.
+- The weather effects starting by themselves from real weather, rain leaning with the wind,
+  fog over a day picture, and what the effects cost in frame time. Each was only forced on.
 - Voice search and Google Assistant after the removals.
 - Casting to the TV after the removals.
 - Switching to an HDMI input from the Inputs menu (the menu opens; no input was selected).

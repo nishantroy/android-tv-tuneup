@@ -155,7 +155,9 @@ All of the pictures are drawn by the scripts in [`wallpapers/`](wallpapers).
 Both are optional and set over adb; the manual guide has the commands. Weather is off until
 you give it a place, because it means sending that place's coordinates to a weather service.
 The ambient screen can also replace the TV's screensaver, so it appears when the TV is left
-idle inside an app too.
+idle inside an app too. With weather on, the ambient screen draws it over whatever picture is
+showing, yours included: rain, drizzle, snow or drifting fog, and on clear nights the odd
+shooting star. It is only on the ambient screen, where nothing else moves.
 
 For screenshots that don't show your own viewing history, start it in demo mode:
 

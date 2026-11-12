@@ -38,7 +38,15 @@ final class Weather {
         boolean day;
         /** Today's sunrise and sunset there, in minutes after midnight, or -1 if not known. */
         int sunrise = -1, sunset = -1;
+        /** Wind in km/h and the compass direction it blows from; visibility in metres, -1 if not known. */
+        float wind, windFrom;
+        int visibility = -1;
         String place;
+
+        /** Fog by the weather code, or by how far one can see: the coast's low fog is often reported only as cloud. */
+        boolean foggy() {
+            return code == 45 || code == 48 || (visibility >= 0 && visibility < 3000);
+        }
 
         /** A word or two for the conditions, from the WMO weather code. */
         String words() {
@@ -98,6 +106,9 @@ final class Weather {
         n.day = p.getBoolean("day", true);
         n.sunrise = p.getInt("sunrise", -1);
         n.sunset = p.getInt("sunset", -1);
+        n.wind = p.getFloat("wind", 0);
+        n.windFrom = p.getFloat("windFrom", 0);
+        n.visibility = p.getInt("visibility", -1);
         n.place = p.getString("place", "");
         return n;
     }
@@ -110,15 +121,15 @@ final class Weather {
             done.accept(null);
             return;
         }
-        // A reading saved before sunrise and sunset were kept is fetched again to get them.
-        if (System.currentTimeMillis() - p.getLong("at", 0) < FRESH_MS && p.contains("sunrise")) {
+        // A reading saved before wind and visibility were kept is fetched again to get them.
+        if (System.currentTimeMillis() - p.getLong("at", 0) < FRESH_MS && p.contains("visibility")) {
             done.accept(cached(c));
             return;
         }
         io.execute(() -> {
             try {
                 String url = String.format(Locale.US, "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f"
-                        + "&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset"
+                        + "&current=temperature_2m,weather_code,is_day,wind_speed_10m,wind_direction_10m,visibility&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset"
                         + "&temperature_unit=%s&timezone=auto&forecast_days=1",
                         p.getFloat("lat", 0), p.getFloat("lon", 0),
                         p.getBoolean("fahrenheit", false) ? "fahrenheit" : "celsius");
@@ -127,6 +138,9 @@ final class Weather {
                 p.edit().putInt("temp", (int) Math.round(current.getDouble("temperature_2m")))
                         .putInt("code", current.getInt("weather_code"))
                         .putBoolean("day", current.getInt("is_day") == 1)
+                        .putFloat("wind", (float) current.optDouble("wind_speed_10m", 0))
+                        .putFloat("windFrom", (float) current.optDouble("wind_direction_10m", 0))
+                        .putInt("visibility", current.isNull("visibility") ? -1 : (int) current.optDouble("visibility", -1))
                         .putInt("high", (int) Math.round(daily.getJSONArray("temperature_2m_max").getDouble(0)))
                         .putInt("low", (int) Math.round(daily.getJSONArray("temperature_2m_min").getDouble(0)))
                         .putInt("sunrise", minutes(daily.optJSONArray("sunrise")))
